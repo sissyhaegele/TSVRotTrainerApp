@@ -192,7 +192,8 @@ function WeeklyPlanPage({ isAdmin, isDashboard = false }: WeeklyPlanPageProps) {
 }
 
 function CourseCard({ course, trainers }: {
-  course: any;\n  trainers: any[];
+  course: any;
+  trainers: any[];
 }) {
   const [trainerAssignments, setTrainerAssignments] = useState(trainers);
   const [showSubstituteForm, setShowSubstituteForm] = useState<number | null>(null);
@@ -409,5 +410,6 @@ function SubstituteForm({ onSubmit, onCancel }: {
 }
 
 export default WeeklyPlanPage;
+
 
 
