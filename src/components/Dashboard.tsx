@@ -8,7 +8,6 @@ interface DashboardProps {
 function Dashboard({ isAdmin }: DashboardProps) {
   return (
     <div>
-      {/* Dashboard zeigt einfach den Wochenplan für aktuelle Woche */}
       <WeeklyPlanPage isAdmin={isAdmin} isDashboard={true} />
     </div>
   );
