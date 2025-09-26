@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Calendar, AlertTriangle, User, CheckCircle, Clock, Edit3, Phone, Mail, UserPlus, Trash2 } from 'lucide-react';
+import { Calendar, AlertTriangle, User, CheckCircle, Clock, Phone, Mail, UserPlus } from 'lucide-react';
 
 interface WeeklyPlanPageProps {
   isAdmin: boolean;
@@ -191,10 +191,8 @@ function WeeklyPlanPage({ isAdmin, isDashboard = false }: WeeklyPlanPageProps) {
   );
 }
 
-function CourseCard({ course, trainers, isAdmin }: {
-  course: any;
-  trainers: any[];
-  isAdmin: boolean;
+function CourseCard({ course, trainers }: {
+  course: any;\n  trainers: any[];
 }) {
   const [trainerAssignments, setTrainerAssignments] = useState(trainers);
   const [showSubstituteForm, setShowSubstituteForm] = useState<number | null>(null);
@@ -411,4 +409,5 @@ function SubstituteForm({ onSubmit, onCancel }: {
 }
 
 export default WeeklyPlanPage;
+
 

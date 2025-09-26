@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Clock, Users, MapPin, Award, AlertCircle, CheckCircle, BookOpen, AlertTriangle, User } from 'lucide-react';
+import { Plus, Edit, Trash2, Clock, Users, MapPin, CheckCircle, BookOpen, AlertTriangle, User } from 'lucide-react';
 
 interface Course {
   id: number;
@@ -547,4 +547,5 @@ function CourseForm({
 }
 
 export default CoursesPage;
+
 
