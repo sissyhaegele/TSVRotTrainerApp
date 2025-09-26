@@ -2,11 +2,10 @@
 import { Calendar, AlertTriangle, User, CheckCircle, Clock, Phone, Mail, UserPlus } from 'lucide-react';
 
 interface WeeklyPlanPageProps {
-  isAdmin: boolean;
   isDashboard?: boolean;
 }
 
-function WeeklyPlanPage({ isAdmin, isDashboard = false }: WeeklyPlanPageProps) {
+function WeeklyPlanPage({ isDashboard = false }: WeeklyPlanPageProps) {
   const [selectedWeek, setSelectedWeek] = useState('KW39 2025 (22.09.)');
   
   // Dynamische Wochenberechnung
@@ -161,7 +160,6 @@ function WeeklyPlanPage({ isAdmin, isDashboard = false }: WeeklyPlanPageProps) {
               isSubstitute: false
             }
           ]}
-          isAdmin={isAdmin}
         />
         
         <CourseCard
@@ -184,7 +182,6 @@ function WeeklyPlanPage({ isAdmin, isDashboard = false }: WeeklyPlanPageProps) {
               isSubstitute: false
             }
           ]}
-          isAdmin={isAdmin}
         />
       </div>
     </div>
@@ -410,6 +407,10 @@ function SubstituteForm({ onSubmit, onCancel }: {
 }
 
 export default WeeklyPlanPage;
+
+
+
+
 
 
 

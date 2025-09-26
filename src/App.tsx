@@ -81,8 +81,8 @@ function App() {
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 px-4">
-        {activeTab === 'dashboard' && <Dashboard isAdmin={isAdmin} onTabChange={setActiveTab} />}
-        {activeTab === 'weekly-plan' && <WeeklyPlanPage isAdmin={isAdmin} />}
+        {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
+        {activeTab === 'weekly-plan' && <WeeklyPlanPage />}
         {activeTab === 'trainers' && <TrainersPage isAdmin={isAdmin} />}
         {activeTab === 'courses' && <CoursesPage isAdmin={isAdmin} />}
       </main>
@@ -173,6 +173,8 @@ function TabButton({
 }
 
 export default App
+
+
 
 
 
