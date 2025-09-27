@@ -1,5 +1,4 @@
-﻿
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Plus, Edit, Trash2, User, Mail, Phone, Award } from 'lucide-react';
 
 interface Trainer {
@@ -460,10 +459,6 @@ function TrainerForm({
 }
 
 export default TrainersPage;
-
-
-
-
 
 
 
