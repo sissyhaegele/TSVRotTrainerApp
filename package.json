@@ -1,36 +1,37 @@
-{
-  "name": "tsv-rot-trainer-app",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:azure": "npm install && npm run build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
-    "type-check": "tsc --noEmit",
-    "start": "vite preview --port $PORT --host 0.0.0.0"
-  },
-  "dependencies": {
-    "lucide-react": "^0.263.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.15.0",
-    "@typescript-eslint/parser": "^7.15.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.7",
-    "typescript": "^5.2.2",
-    "vite": "^5.3.4"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  }
+﻿{
+    "name":  "tsv-rot-trainer-app",
+    "private":  true,
+    "version":  "1.0.0",
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "vite",
+                    "build":  "tsc -b \u0026\u0026 vite build",
+                    "build:azure":  "npm install \u0026\u0026 npm run build",
+                    "lint":  "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+                    "preview":  "vite preview",
+                    "type-check":  "tsc --noEmit",
+                    "start":  "vite preview --port $PORT --host 0.0.0.0"
+                },
+    "dependencies":  {
+                         "lucide-react":  "^0.263.1",
+                         "react":  "^18.3.1",
+                         "react-dom":  "^18.3.1"
+                     },
+    "devDependencies":  {
+                            "@types/react":  "^18.3.3",
+                            "@types/react-dom":  "^18.3.0",
+                            "@typescript-eslint/eslint-plugin":  "^7.15.0",
+                            "@typescript-eslint/parser":  "^7.15.0",
+                            "@vitejs/plugin-react":  "^4.3.1",
+                            "eslint":  "^8.57.0",
+                            "eslint-plugin-react-hooks":  "^4.6.2",
+                            "eslint-plugin-react-refresh":  "^0.4.7",
+                            "typescript":  "^5.2.2",
+                            "vite":  "^5.3.4"
+                        },
+    "engines":  {
+                    "node":  "\u003e=18.0.0",
+                    "npm":  "\u003e=9.0.0"
+                },
+    "homepage":  "https://sissyhaegele.github.io/TSVRotTrainerApp"
 }
