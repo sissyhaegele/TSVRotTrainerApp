@@ -18,10 +18,10 @@ jobs:
         node-version: '18'
         
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       
-    - name: Build
-      run: npm run build
+    - name: Build with npx
+      run: npx vite build
       
     - name: Add server.js
       run: |
@@ -36,11 +36,10 @@ jobs:
         app.listen(process.env.PORT || 8080);
         EOF
         
-    - name: Add start script
-      run: npm pkg set scripts.start="node server.js"
-      
-    - name: Install Express
-      run: npm install express
+    - name: Add start script to package.json
+      run: |
+        npm pkg set scripts.start="node server.js"
+        npm install express --save
       
     - name: Deploy to Azure
       uses: azure/webapps-deploy@v2
