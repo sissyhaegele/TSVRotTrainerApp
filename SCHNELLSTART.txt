@@ -1,0 +1,66 @@
+====================================
+TSV ROT TRAINER APP - SCHNELLSTART
+====================================
+
+KEIN LOGIN NÖTIG - App startet direkt!
+
+====================================
+OPTION 1: AUTOMATISCH (Windows)
+====================================
+
+Doppelklick auf:
+→ install-and-run.bat
+
+Fertig! Browser öffnet sich automatisch.
+
+====================================
+OPTION 2: POWERSHELL
+====================================
+
+Rechtsklick auf:
+→ install-and-run.ps1
+→ "Mit PowerShell ausführen"
+
+====================================
+OPTION 3: MANUELL
+====================================
+
+1. Kommandozeile/Terminal öffnen
+2. In den TSVRotTrainer Ordner wechseln
+3. Befehle eingeben:
+
+   npm install
+   npm run dev
+
+4. Browser öffnen: http://localhost:5173
+
+====================================
+BEISPIELDATEN LADEN
+====================================
+
+1. App starten (siehe oben)
+2. Im Browser öffnen:
+   http://localhost:5173/init-data.html
+3. "Beispieldaten laden" klicken
+4. Zurück zur App
+
+====================================
+FEATURES
+====================================
+
+✓ Admin-Modus ist standardmäßig AN
+✓ Kein Login erforderlich
+✓ Alle Daten im Browser gespeichert
+✓ Trainer-Soll pro Kurs einstellbar
+✓ Vertretungsmanagement
+✓ Farbcodierte Statusanzeige
+
+====================================
+HILFE
+====================================
+
+Bei Problemen:
+- Node.js installieren: nodejs.org
+- Port ändern: npm run dev -- --port 3000
+
+© 2024 TSV Rot 1905 e.V.

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSV Rot - Jahresabrechnung Trainer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #dc2626;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .controls input, .controls select {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+        }
+        .export-btn {
+            background: #10b981;
+        }
+        .export-btn:hover {
+            background: #059669;
+        }
+        .print-btn {
+            background: #3b82f6;
+        }
+        .print-btn:hover {
+            background: #2563eb;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #111827;
+        }
+        .stat-label {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th {
+            background: #f3f4f6;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+        tr:hover {
+            background: #f9fafb;
+        }
+        .trainer-name {
+            font-weight: 600;
+            color: #111827;
+        }
+        .present {
+            background: #dcfce7;
+            color: #166534;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .absent {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .summary-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #eff6ff;
+            border-radius: 8px;
+            border: 1px solid #3b82f6;
+        }
+        .summary-grid {
+            display: grid;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .trainer-summary {
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .trainer-details {
+            flex: 1;
+        }
+        .trainer-stats {
+            display: flex;
+            gap: 20px;
+        }
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            .controls {
+                display: none;
+            }
+            button {
+                display: none;
+            }
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .controls {
+                flex-direction: column;
+            }
+            .controls input, .controls select {
+                width: 100%;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .trainer-stats {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 TSV Rot - Jahresabrechnung Trainer</h1>
+        <div class="subtitle">Anwesenheitsauswertung für die Trainerabrechnung</div>
+        
+        <div class="controls">
+            <select id="yearSelect">
+                <option value="2024">2024</option>
+                <option value="2025" selected>2025</option>
+            </select>
+            <select id="monthSelect">
+                <option value="">Ganzes Jahr</option>
+                <option value="0">Januar</option>
+                <option value="1">Februar</option>
+                <option value="2">März</option>
+                <option value="3">April</option>
+                <option value="4">Mai</option>
+                <option value="5">Juni</option>
+                <option value="6">Juli</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">Oktober</option>
+                <option value="10">November</option>
+                <option value="11">Dezember</option>
+            </select>
+            <select id="trainerSelect">
+                <option value="">Alle Trainer</option>
+            </select>
+            <button onclick="generateReport()">📊 Bericht erstellen</button>
+            <button onclick="exportToCSV()" class="export-btn">📥 CSV Export</button>
+            <button onclick="window.print()" class="print-btn">🖨️ Drucken</button>
+        </div>
+        
+        <div id="statsSection"></div>
+        <div id="reportSection"></div>
+        <div id="summarySection"></div>
+    </div>
+    
+    <script>
+    let allSessions = [];
+    let allTrainers = [];
+    let allCourses = [];
+    
+    function loadData() {
+        allSessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
+        allTrainers = JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]');
+        allCourses = JSON.parse(localStorage.getItem('tsvrot-courses') || '[]');
+        
+        // Trainer-Dropdown füllen
+        const trainerSelect = document.getElementById('trainerSelect');
+        trainerSelect.innerHTML = '<option value="">Alle Trainer</option>';
+        allTrainers.forEach(trainer => {
+            const option = document.createElement('option');
+            option.value = trainer.id;
+            option.textContent = `${trainer.firstName} ${trainer.lastName}`;
+            trainerSelect.appendChild(option);
+        });
+        
+        // Auto-generate für aktuelles Jahr
+        generateReport();
+    }
+    
+    function generateReport() {
+        const year = parseInt(document.getElementById('yearSelect').value);
+        const month = document.getElementById('monthSelect').value;
+        const selectedTrainerId = document.getElementById('trainerSelect').value;
+        
+        // Filter Sessions nach Zeitraum
+        let filteredSessions = allSessions.filter(session => {
+            const sessionDate = new Date(session.date);
+            if (sessionDate.getFullYear() !== year) return false;
+            if (month !== '' && sessionDate.getMonth() !== parseInt(month)) return false;
+            return true;
+        });
+        
+        // Statistiken berechnen
+        const stats = calculateStats(filteredSessions, selectedTrainerId);
+        displayStats(stats);
+        
+        // Detaillierte Tabelle
+        displayDetailedReport(filteredSessions, selectedTrainerId);
+        
+        // Zusammenfassung pro Trainer
+        displayTrainerSummary(filteredSessions, selectedTrainerId);
+    }
+    
+    function calculateStats(sessions, trainerId) {
+        let totalSessions = 0;
+        let totalAttendances = 0;
+        let totalPresent = 0;
+        let totalAbsent = 0;
+        let trainerStats = {};
+        
+        sessions.forEach(session => {
+            totalSessions++;
+            
+            if (session.attendance) {
+                session.attendance.forEach(att => {
+                    if (trainerId === '' || att.trainerId == trainerId) {
+                        totalAttendances++;
+                        
+                        if (att.isPresent) {
+                            totalPresent++;
+                        } else {
+                            totalAbsent++;
+                        }
+                        
+                        // Pro Trainer sammeln
+                        if (!trainerStats[att.trainerId]) {
+                            const trainer = allTrainers.find(t => t.id == att.trainerId);
+                            trainerStats[att.trainerId] = {
+                                name: trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unbekannt',
+                                present: 0,
+                                absent: 0,
+                                total: 0,
+                                sessions: []
+                            };
+                        }
+                        
+                        trainerStats[att.trainerId].total++;
+                        if (att.isPresent) {
+                            trainerStats[att.trainerId].present++;
+                        } else {
+                            trainerStats[att.trainerId].absent++;
+                        }
+                        
+                        // Session Details speichern
+                        const course = allCourses.find(c => c.id === session.courseId);
+                        trainerStats[att.trainerId].sessions.push({
+                            date: session.date,
+                            courseName: course ? course.name : 'Unbekannt',
+                            isPresent: att.isPresent,
+                            note: att.note || ''
+                        });
+                    }
+                });
+            }
+        });
+        
+        return {
+            totalSessions,
+            totalAttendances,
+            totalPresent,
+            totalAbsent,
+            attendanceRate: totalAttendances > 0 ? Math.round((totalPresent / totalAttendances) * 100) : 0,
+            trainerStats
+        };
+    }
+    
+    function displayStats(stats) {
+        const html = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalSessions}</div>
+                    <div class="stat-label">Trainingseinheiten</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalPresent}</div>
+                    <div class="stat-label">Anwesenheiten</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalAbsent}</div>
+                    <div class="stat-label">Fehlzeiten</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.attendanceRate}%</div>
+                    <div class="stat-label">Anwesenheitsquote</div>
+                </div>
+            </div>
+        `;
+        document.getElementById('statsSection').innerHTML = html;
+    }
+    
+    function displayDetailedReport(sessions, trainerId) {
+        if (sessions.length === 0) {
+            document.getElementById('reportSection').innerHTML = `
+                <div class="no-data">
+                    <h3>Keine Daten vorhanden</h3>
+                    <p>Für den gewählten Zeitraum wurden keine Trainingseinheiten erfasst.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <h2 style="margin-top: 30px; margin-bottom: 15px;">📅 Detaillierte Übersicht</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Kurs</th>
+                        <th>Trainer</th>
+                        <th>Status</th>
+                        <th>Notiz</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        sessions.forEach(session => {
+            const course = allCourses.find(c => c.id === session.courseId);
+            const sessionDate = new Date(session.date).toLocaleDateString('de-DE');
+            
+            if (session.attendance && session.attendance.length > 0) {
+                session.attendance.forEach(att => {
+                    if (trainerId === '' || att.trainerId == trainerId) {
+                        const trainer = allTrainers.find(t => t.id == att.trainerId);
+                        html += `
+                            <tr>
+                                <td>${sessionDate}</td>
+                                <td>${course ? course.name : 'Unbekannt'}</td>
+                                <td class="trainer-name">${trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unbekannt'}</td>
+                                <td><span class="${att.isPresent ? 'present' : 'absent'}">${att.isPresent ? 'Anwesend' : 'Fehlend'}</span></td>
+                                <td>${att.note || '-'}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            } else {
+                html += `
+                    <tr>
+                        <td>${sessionDate}</td>
+                        <td>${course ? course.name : 'Unbekannt'}</td>
+                        <td colspan="3" style="color: #9ca3af;">Keine Anwesenheit erfasst</td>
+                    </tr>
+                `;
+            }
+        });
+        
+        html += '</tbody></table>';
+        document.getElementById('reportSection').innerHTML = html;
+    }
+    
+    function displayTrainerSummary(sessions, trainerId) {
+        const stats = calculateStats(sessions, trainerId);
+        
+        if (Object.keys(stats.trainerStats).length === 0) {
+            document.getElementById('summarySection').innerHTML = '';
+            return;
+        }
+        
+        let html = `
+            <div class="summary-section">
+                <h2>👥 Trainer-Zusammenfassung</h2>
+                <p style="color: #6b7280; margin-top: 5px;">Übersicht der Anwesenheitstage pro Trainer</p>
+                <div class="summary-grid">
+        `;
+        
+        // Sortieren nach Anwesenheitstagen
+        const sortedTrainers = Object.entries(stats.trainerStats)
+            .sort((a, b) => b[1].present - a[1].present);
+        
+        sortedTrainers.forEach(([trainerId, trainerData]) => {
+            const percentage = Math.round((trainerData.present / trainerData.total) * 100);
+            html += `
+                <div class="trainer-summary">
+                    <div class="trainer-details">
+                        <div style="font-weight: 600; font-size: 16px;">${trainerData.name}</div>
+                        <div style="color: #6b7280; font-size: 14px; margin-top: 5px;">
+                            ${trainerData.total} Einheiten geplant | ${percentage}% Anwesenheit
+                        </div>
+                    </div>
+                    <div class="trainer-stats">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #10b981;">${trainerData.present}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Anwesend</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #ef4444;">${trainerData.absent}</div>
+                            <div style="font-size: 12px; color: #6b7280;">Fehlend</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+        document.getElementById('summarySection').innerHTML = html;
+    }
+    
+    function exportToCSV() {
+        const year = document.getElementById('yearSelect').value;
+        const month = document.getElementById('monthSelect').value;
+        const monthName = month ? document.getElementById('monthSelect').options[parseInt(month) + 1].text : 'Ganzes-Jahr';
+        
+        let csv = 'Datum,Kurs,Trainer,Status,Notiz\n';
+        
+        const filteredSessions = allSessions.filter(session => {
+            const sessionDate = new Date(session.date);
+            if (sessionDate.getFullYear() != year) return false;
+            if (month !== '' && sessionDate.getMonth() != parseInt(month)) return false;
+            return true;
+        });
+        
+        filteredSessions.forEach(session => {
+            const course = allCourses.find(c => c.id === session.courseId);
+            const sessionDate = new Date(session.date).toLocaleDateString('de-DE');
+            
+            if (session.attendance) {
+                session.attendance.forEach(att => {
+                    const trainer = allTrainers.find(t => t.id == att.trainerId);
+                    csv += `"${sessionDate}","${course ? course.name : 'Unbekannt'}","${trainer ? trainer.firstName + ' ' + trainer.lastName : 'Unbekannt'}","${att.isPresent ? 'Anwesend' : 'Fehlend'}","${att.note || ''}"\n`;
+                });
+            }
+        });
+        
+        // Download
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `TSV-Rot-Abrechnung-${year}-${monthName}.csv`;
+        link.click();
+    }
+    
+    // Beim Laden
+    window.onload = loadData;
+    </script>
+</body>
+</html>

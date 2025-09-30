@@ -1,0 +1,65 @@
+=====================================
+TSV 1905 ROT - TURNABTEILUNG
+=====================================
+ECHTE VEREINSDATEN VORINSTALLIERT
+=====================================
+
+Die App enthält bereits ALLE aktuellen Daten
+der TSV Rot Turnabteilung (Stand: Dezember 2024)
+
+=====================================
+9 TRAINER/INNEN
+=====================================
+
+MONTAG:
+• Irmgard Stegmüller - Frauengymnastik, Seniorengymnastik
+• Ulrike Keßler - Aerobic/Dance
+
+DIENSTAG:
+• Sarah Winkler - Kinderturnen
+• Desiree Knopf - Kinderturnen  
+• Julia Miller - Kinderturnen
+• Sabrina Gund - Kinderturnen
+• Irmgard Stegmüller - Seniorengymnastik
+
+FREITAG:
+• Josef Kahlenberg - Kinderturnen
+• Jasmin Ittensohn - Kinderturnen
+• Marvin Arne Vögeli - Kinderturnen
+
+=====================================
+7 KURSE
+=====================================
+
+MONTAG:
+20:00-21:00 Frauengymnastik (Multifunktionshalle)
+21:00-22:00 Aerobic/Dance (Multifunktionshalle)
+
+DIENSTAG:
+15:00-16:00 Seniorengymnastik (Multifunktionshalle)
+15:00-16:00 Turnwichtel 2-5 Jahre (Parkringhalle)
+16:00-17:00 Turnzwerge 2-5 Jahre (Parkringhalle)
+
+FREITAG:
+15:30-16:30 Kinderturnen ab 5 (Parkringhalle)
+16:30-17:30 Kinderturnen ab 8 (Parkringhalle)
+
+=====================================
+STATUS
+=====================================
+
+✅ 6 Kurse optimal besetzt
+⚠️  1 Kurs unterbesetzt: 
+    Turnzwerge (benötigt noch 1 Trainer)
+
+=====================================
+SO GEHT'S
+=====================================
+
+1. START-DIREKT.bat doppelklicken
+2. App startet mit allen Daten
+3. Sofort loslegen!
+
+Keine weitere Konfiguration nötig!
+
+© 2024 TSV 1905 Rot e.V.

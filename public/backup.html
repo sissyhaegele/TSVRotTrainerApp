@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSV Rot - Backup & Restore</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #dc2626;
+            margin-bottom: 10px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .section h2 {
+            color: #111827;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .section p {
+            color: #6b7280;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+        }
+        .backup-btn {
+            background: #10b981;
+        }
+        .backup-btn:hover {
+            background: #059669;
+        }
+        .restore-btn {
+            background: #3b82f6;
+        }
+        .restore-btn:hover {
+            background: #2563eb;
+        }
+        .delete-btn {
+            background: #ef4444;
+        }
+        .delete-btn:hover {
+            background: #dc2626;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat {
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #111827;
+        }
+        .stat-label {
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .warning {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            display: none;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .file-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #6b7280;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        .file-label:hover {
+            background: #4b5563;
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px;
+            }
+            button {
+                width: 100%;
+                margin: 5px 0;
+            }
+            .file-label {
+                width: 100%;
+                text-align: center;
+                margin: 5px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 TSV Rot - Datensicherung</h1>
+        <p style="color: #6b7280; margin-bottom: 30px;">Sichern Sie Ihre Trainer-, Kurs- und Anwesenheitsdaten</p>
+        
+        <div id="statsSection" class="section">
+            <h2>📊 Aktueller Datenbestand</h2>
+            <div class="stats" id="currentStats">
+                <!-- Wird dynamisch gefüllt -->
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>💾 Backup erstellen</h2>
+            <p>Erstellen Sie eine vollständige Sicherung aller Daten. Diese Datei enthält alle Trainer, Kurse und Trainingseinheiten mit Anwesenheitslisten.</p>
+            <button onclick="createBackup()" class="backup-btn">
+                📥 Backup herunterladen
+            </button>
+            <button onclick="createYearBackup()" class="backup-btn">
+                📅 Nur 2025 sichern
+            </button>
+        </div>
+        
+        <div class="section">
+            <h2>📤 Daten wiederherstellen</h2>
+            <p>Laden Sie eine zuvor gesicherte Backup-Datei hoch, um alle Daten wiederherzustellen.</p>
+            <div class="warning">
+                ⚠️ <strong>Achtung:</strong> Beim Wiederherstellen werden ALLE aktuellen Daten überschrieben!
+            </div>
+            <input type="file" id="restoreFile" accept=".json" onchange="restoreBackup(event)">
+            <label for="restoreFile" class="file-label">📂 Backup-Datei auswählen</label>
+        </div>
+        
+        <div class="section">
+            <h2>🗑️ Daten löschen</h2>
+            <p>Löschen Sie gezielt bestimmte Daten oder setzen Sie die App komplett zurück.</p>
+            <button onclick="deleteOldSessions()" class="delete-btn">
+                🗓️ Alte Einheiten löschen (vor 2025)
+            </button>
+            <button onclick="deleteAllSessions()" class="delete-btn">
+                📝 Nur Trainingseinheiten löschen
+            </button>
+            <button onclick="resetAll()" class="delete-btn">
+                ⚠️ ALLES zurücksetzen
+            </button>
+        </div>
+        
+        <div class="section">
+            <h2>🔗 Weitere Funktionen</h2>
+            <button onclick="window.location.href='/jahresabrechnung.html'">
+                📊 Zur Jahresabrechnung
+            </button>
+            <button onclick="window.location.href='/daten-check.html'">
+                🔍 Daten prüfen
+            </button>
+            <button onclick="window.location.href='/'">
+                🏠 Zur App
+            </button>
+        </div>
+        
+        <div id="successMessage" class="success">
+            ✅ Aktion erfolgreich ausgeführt!
+        </div>
+    </div>
+    
+    <script>
+    function loadStats() {
+        const trainers = JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]');
+        const courses = JSON.parse(localStorage.getItem('tsvrot-courses') || '[]');
+        const sessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
+        
+        // Statistiken berechnen
+        let totalAttendances = 0;
+        let sessionsThisYear = 0;
+        const currentYear = new Date().getFullYear();
+        
+        sessions.forEach(session => {
+            if (session.attendance) {
+                totalAttendances += session.attendance.length;
+            }
+            if (new Date(session.date).getFullYear() === currentYear) {
+                sessionsThisYear++;
+            }
+        });
+        
+        // Größe berechnen
+        const dataSize = JSON.stringify({trainers, courses, sessions}).length;
+        const sizeKB = (dataSize / 1024).toFixed(1);
+        
+        document.getElementById('currentStats').innerHTML = `
+            <div class="stat">
+                <div class="stat-value">${trainers.length}</div>
+                <div class="stat-label">Trainer</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${courses.length}</div>
+                <div class="stat-label">Kurse</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${sessions.length}</div>
+                <div class="stat-label">Einheiten gesamt</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${sessionsThisYear}</div>
+                <div class="stat-label">Einheiten ${currentYear}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${totalAttendances}</div>
+                <div class="stat-label">Anwesenheiten</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">${sizeKB} KB</div>
+                <div class="stat-label">Datengröße</div>
+            </div>
+        `;
+    }
+    
+    function createBackup() {
+        const data = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            trainers: JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]'),
+            courses: JSON.parse(localStorage.getItem('tsvrot-courses') || '[]'),
+            sessions: JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]')
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TSV-Rot-Backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        
+        showSuccess();
+    }
+    
+    function createYearBackup() {
+        const year = new Date().getFullYear();
+        const allSessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
+        const yearSessions = allSessions.filter(s => 
+            new Date(s.date).getFullYear() === year
+        );
+        
+        const data = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            year: year,
+            trainers: JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]'),
+            courses: JSON.parse(localStorage.getItem('tsvrot-courses') || '[]'),
+            sessions: yearSessions
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TSV-Rot-Backup-${year}.json`;
+        a.click();
+        
+        showSuccess();
+    }
+    
+    function restoreBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (!confirm(`Wirklich wiederherstellen?\n\n` +
+                    `Die Datei enthält:\n` +
+                    `- ${data.trainers?.length || 0} Trainer\n` +
+                    `- ${data.courses?.length || 0} Kurse\n` +
+                    `- ${data.sessions?.length || 0} Trainingseinheiten\n\n` +
+                    `ALLE aktuellen Daten werden überschrieben!`)) {
+                    return;
+                }
+                
+                if (data.trainers) localStorage.setItem('tsvrot-trainers', JSON.stringify(data.trainers));
+                if (data.courses) localStorage.setItem('tsvrot-courses', JSON.stringify(data.courses));
+                if (data.sessions) localStorage.setItem('tsvrot-sessions', JSON.stringify(data.sessions));
+                
+                showSuccess();
+                setTimeout(() => location.reload(), 2000);
+            } catch (error) {
+                alert('Fehler beim Lesen der Backup-Datei: ' + error.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+    
+    function deleteOldSessions() {
+        if (!confirm('Alle Trainingseinheiten vor 2025 löschen?')) return;
+        
+        const sessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
+        const filtered = sessions.filter(s => 
+            new Date(s.date).getFullYear() >= 2025
+        );
+        
+        localStorage.setItem('tsvrot-sessions', JSON.stringify(filtered));
+        showSuccess();
+        loadStats();
+    }
+    
+    function deleteAllSessions() {
+        if (!confirm('ALLE Trainingseinheiten löschen?\n\nTrainer und Kurse bleiben erhalten.')) return;
+        
+        localStorage.setItem('tsvrot-sessions', JSON.stringify([]));
+        showSuccess();
+        loadStats();
+    }
+    
+    function resetAll() {
+        if (!confirm('WIRKLICH ALLES LÖSCHEN?\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) return;
+        if (!confirm('LETZTE WARNUNG!\n\nAlle Trainer, Kurse und Trainingseinheiten werden gelöscht!')) return;
+        
+        localStorage.removeItem('tsvrot-trainers');
+        localStorage.removeItem('tsvrot-courses');
+        localStorage.removeItem('tsvrot-sessions');
+        
+        showSuccess();
+        setTimeout(() => window.location.href = '/', 2000);
+    }
+    
+    function showSuccess() {
+        const msg = document.getElementById('successMessage');
+        msg.style.display = 'block';
+        setTimeout(() => msg.style.display = 'none', 3000);
+    }
+    
+    // Beim Laden
+    window.onload = loadStats;
+    </script>
+</body>
+</html>
