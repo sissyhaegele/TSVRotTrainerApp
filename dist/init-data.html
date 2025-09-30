@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>TSV Rot - Daten initialisieren</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 20px;
+            background: #f0f9ff;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success { background: #dcfce7; color: #166534; }
+        button {
+            background: #dc2626;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover { background: #b91c1c; }
+        .secondary {
+            background: #6b7280;
+        }
+        .secondary:hover { background: #4b5563; }
+    </style>
+</head>
+<body>
+    <h1>🏃 TSV 1905 Rot - Turnabteilung</h1>
+    
+    <div class="status">
+        <h2>Echte Vereinsdaten laden</h2>
+        <p>Lädt die aktuellen Trainer und Kurse der TSV Rot Turnabteilung (Stand: Dezember 2024).</p>
+        <button onclick="loadSampleData()">TSV Rot Daten laden</button>
+        <button onclick="clearAllData()" class="secondary">Alle Daten löschen</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+    function loadSampleData() {
+        // ECHTE TSV ROT TRAINER & KURSE von der Homepage
+        const trainers = [
+            { id: 1, firstName: "Irmgard", lastName: "Stegmüller", email: "irmgard.stegmueller@tsvrot.de", phone: "", availability: ["Montag", "Dienstag"], qualifications: ["Frauengymnastik", "Seniorengymnastik", "Pilates"] },
+            { id: 2, firstName: "Ulrike", lastName: "Keßler", email: "ulrike.kessler@tsvrot.de", phone: "", availability: ["Montag"], qualifications: ["Aerobic", "Dance", "Fitness"] },
+            { id: 3, firstName: "Sarah", lastName: "Winkler", email: "sarah.winkler@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 4, firstName: "Desiree", lastName: "Knopf", email: "desiree.knopf@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 5, firstName: "Julia", lastName: "Miller", email: "julia.miller@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 6, firstName: "Sabrina", lastName: "Gund", email: "sabrina.gund@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 7, firstName: "Josef", lastName: "Kahlenberg", email: "josef.kahlenberg@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
+            { id: 8, firstName: "Jasmin", lastName: "Ittensohn", email: "jasmin.ittensohn@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
+            { id: 9, firstName: "Marvin Arne", lastName: "Vögeli", email: "marvin.voegeli@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen", "Fitness"] }
+        ];
+        
+        // ECHTE TSV ROT KURSE von der Homepage
+        const courses = [
+            { id: 1, name: "Frauengymnastik", dayOfWeek: "Montag", startTime: "20:00", endTime: "21:00", location: "Multifunktionshalle Rot", category: "Gymnastik", requiredTrainers: 1, assignedTrainerIds: [1] },
+            { id: 2, name: "Aerobic / Dance & mehr", dayOfWeek: "Montag", startTime: "21:00", endTime: "22:00", location: "Multifunktionshalle Rot", category: "Fitness", requiredTrainers: 1, assignedTrainerIds: [2] },
+            { id: 3, name: "Seniorengymnastik", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Multifunktionshalle Rot", category: "Seniorensport", requiredTrainers: 1, assignedTrainerIds: [1] },
+            { id: 4, name: "Turnwichtel (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 4, 5] },
+            { id: 5, name: "Turnzwerge (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "16:00", endTime: "17:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 6] },
+            { id: 6, name: "Kinderturnen ab 5 Jahre", dayOfWeek: "Freitag", startTime: "15:30", endTime: "16:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [7, 8] },
+            { id: 7, name: "Kinderturnen ab 8 Jahre", dayOfWeek: "Freitag", startTime: "16:30", endTime: "17:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [8, 9] }
+        ];
+        
+        const sessions = [];
+        
+        localStorage.setItem('tsvrot-trainers', JSON.stringify(trainers));
+        localStorage.setItem('tsvrot-courses', JSON.stringify(courses));
+        localStorage.setItem('tsvrot-sessions', JSON.stringify(sessions));
+        
+        document.getElementById('result').innerHTML = `
+            <div class="status success">
+                <h3>✅ TSV Rot Vereinsdaten erfolgreich geladen!</h3>
+                <ul>
+                    <li>${trainers.length} echte Trainer der Turnabteilung angelegt</li>
+                    <li>${courses.length} aktuelle Kurse aus dem Trainingsangebot</li>
+                    <li>1 Kurs benötigt noch Trainer (Turnzwerge - gelb markiert)</li>
+                </ul>
+                <p style="margin-top: 20px;">
+                    <strong>Geladene Kurse:</strong><br>
+                    • Frauengymnastik (Mo 20:00)<br>
+                    • Aerobic/Dance (Mo 21:00)<br>
+                    • Seniorengymnastik (Di 15:00)<br>
+                    • Turnwichtel & Turnzwerge (Di 15:00-17:00)<br>
+                    • Kinderturnen ab 5 & ab 8 Jahre (Fr 15:30-17:30)
+                </p>
+                <p style="margin-top: 15px;">
+                    <strong>Zurück zur App und loslegen!</strong>
+                </p>
+            </div>
+        `;
+    }
+    
+    function clearAllData() {
+        if (confirm('Wirklich alle Daten löschen?')) {
+            localStorage.removeItem('tsvrot-trainers');
+            localStorage.removeItem('tsvrot-courses');
+            localStorage.removeItem('tsvrot-sessions');
+            
+            document.getElementById('result').innerHTML = `
+                <div class="status success">
+                    <h3>🗑️ Alle Daten gelöscht!</h3>
+                    <p>Die App startet beim nächsten Besuch leer.</p>
+                </div>
+            `;
+        }
+    }
+    </script>
+</body>
+</html>

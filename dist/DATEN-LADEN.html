@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>TSV Rot - Echte Daten JETZT laden!</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 20px;
+            background: #dc2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #dc2626;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            padding: 20px 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #b91c1c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220,38,38,0.4);
+        }
+        .success {
+            background: #10b981;
+        }
+        .success:hover {
+            background: #059669;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 2px solid #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Keine Daten gefunden!</h1>
+        <p style="font-size: 18px; color: #6b7280; margin-bottom: 30px;">
+            Klicken Sie auf den Button um die echten TSV Rot Daten zu laden:
+        </p>
+        
+        <button onclick="loadTSVRotData()" style="font-size: 20px; padding: 25px 50px;">
+            🏃 ECHTE TSV ROT DATEN JETZT LADEN!
+        </button>
+        
+        <div id="status"></div>
+        
+        <p style="margin-top: 30px; color: #9ca3af; font-size: 14px;">
+            Die Daten werden direkt von tsvrot-turnen.de übernommen
+        </p>
+    </div>
+    
+    <script>
+    function loadTSVRotData() {
+        // ECHTE TSV ROT TRAINER
+        const trainers = [
+            { id: 1, firstName: "Irmgard", lastName: "Stegmüller", email: "irmgard.stegmueller@tsvrot.de", phone: "", availability: ["Montag", "Dienstag"], qualifications: ["Frauengymnastik", "Seniorengymnastik", "Pilates"] },
+            { id: 2, firstName: "Ulrike", lastName: "Keßler", email: "ulrike.kessler@tsvrot.de", phone: "", availability: ["Montag"], qualifications: ["Aerobic", "Dance", "Fitness"] },
+            { id: 3, firstName: "Sarah", lastName: "Winkler", email: "sarah.winkler@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 4, firstName: "Desiree", lastName: "Knopf", email: "desiree.knopf@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 5, firstName: "Julia", lastName: "Miller", email: "julia.miller@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 6, firstName: "Sabrina", lastName: "Gund", email: "sabrina.gund@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
+            { id: 7, firstName: "Josef", lastName: "Kahlenberg", email: "josef.kahlenberg@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
+            { id: 8, firstName: "Jasmin", lastName: "Ittensohn", email: "jasmin.ittensohn@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
+            { id: 9, firstName: "Marvin Arne", lastName: "Vögeli", email: "marvin.voegeli@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen", "Fitness"] }
+        ];
+        
+        // ECHTE TSV ROT KURSE
+        const courses = [
+            { id: 1, name: "Frauengymnastik", dayOfWeek: "Montag", startTime: "20:00", endTime: "21:00", location: "Multifunktionshalle Rot", category: "Gymnastik", requiredTrainers: 1, assignedTrainerIds: [1] },
+            { id: 2, name: "Aerobic / Dance & mehr", dayOfWeek: "Montag", startTime: "21:00", endTime: "22:00", location: "Multifunktionshalle Rot", category: "Fitness", requiredTrainers: 1, assignedTrainerIds: [2] },
+            { id: 3, name: "Seniorengymnastik", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Multifunktionshalle Rot", category: "Seniorensport", requiredTrainers: 1, assignedTrainerIds: [1] },
+            { id: 4, name: "Turnwichtel (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 4, 5] },
+            { id: 5, name: "Turnzwerge (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "16:00", endTime: "17:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 6] },
+            { id: 6, name: "Kinderturnen ab 5 Jahre", dayOfWeek: "Freitag", startTime: "15:30", endTime: "16:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [7, 8] },
+            { id: 7, name: "Kinderturnen ab 8 Jahre", dayOfWeek: "Freitag", startTime: "16:30", endTime: "17:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [8, 9] }
+        ];
+        
+        // FORCIERT speichern - überschreibt alles!
+        localStorage.setItem('tsvrot-trainers', JSON.stringify(trainers));
+        localStorage.setItem('tsvrot-courses', JSON.stringify(courses));
+        localStorage.setItem('tsvrot-sessions', JSON.stringify([]));
+        
+        // Status anzeigen
+        document.getElementById('status').style.display = 'block';
+        document.getElementById('status').className = 'status-success';
+        document.getElementById('status').innerHTML = `
+            <h2>✅ Erfolgreich geladen!</h2>
+            <p><strong>${trainers.length} Trainer</strong> und <strong>${courses.length} Kurse</strong> der TSV Rot Turnabteilung wurden geladen!</p>
+            <p style="margin-top: 20px;">
+                <button onclick="window.location.href='/'" class="success">
+                    → Zur App gehen
+                </button>
+            </p>
+        `;
+        
+        // Nach 2 Sekunden automatisch zur App
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 2000);
+    }
+    
+    // Beim Laden prüfen
+    window.onload = function() {
+        const courses = JSON.parse(localStorage.getItem('tsvrot-courses') || '[]');
+        const trainers = JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]');
+        
+        if (courses.length > 0 && trainers.length > 0) {
+            document.querySelector('h1').textContent = '✅ Daten vorhanden!';
+            document.querySelector('p').textContent = 'Es sind bereits Daten geladen. Möchten Sie diese überschreiben?';
+            document.querySelector('button').textContent = '🔄 Daten neu laden';
+        }
+    };
+    </script>
+</body>
+</html>

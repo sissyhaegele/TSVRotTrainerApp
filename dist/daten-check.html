@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>TSV Rot - Daten-Check</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f3f4f6;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 { color: #dc2626; }
+        .status-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .success { background: #dcfce7; color: #166534; }
+        .warning { background: #fef3c7; color: #92400e; }
+        .error { background: #fee2e2; color: #991b1b; }
+        .info { background: #dbeafe; color: #1e40af; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        .trainer-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 4px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .course-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-optimal { background: #dcfce7; color: #166534; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        .status-critical { background: #fee2e2; color: #991b1b; }
+        button {
+            background: #dc2626;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #b91c1c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 TSV Rot - Daten-Check</h1>
+        <p>Diese Seite zeigt, welche Daten aktuell in der App gespeichert sind.</p>
+        
+        <div id="summary"></div>
+        
+        <h2>📊 Kurse</h2>
+        <div id="courses"></div>
+        
+        <h2>👥 Trainer</h2>
+        <div id="trainers"></div>
+        
+        <h2>🔧 Aktionen</h2>
+        <button onclick="window.location.href='/'">Zur App</button>
+        <button onclick="exportData()">Daten exportieren</button>
+        <button onclick="clearData()">Alle Daten löschen</button>
+    </div>
+    
+    <script>
+    function checkData() {
+        const courses = JSON.parse(localStorage.getItem('tsvrot-courses') || '[]');
+        const trainers = JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]');
+        const sessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
+        
+        // Zusammenfassung
+        const summaryDiv = document.getElementById('summary');
+        if (courses.length === 0 && trainers.length === 0) {
+            summaryDiv.innerHTML = `
+                <div class="status-box error">
+                    <h3>❌ Keine Daten gefunden!</h3>
+                    <p>Die App enthält noch keine Trainer oder Kurse.</p>
+                    <p><strong>Lösung:</strong> Starten Sie die App neu - die echten TSV Rot Daten werden automatisch geladen!</p>
+                </div>
+            `;
+        } else if (courses.length === 7 && trainers.length === 9) {
+            summaryDiv.innerHTML = `
+                <div class="status-box success">
+                    <h3>✅ Echte TSV Rot Daten geladen!</h3>
+                    <p>${trainers.length} Trainer und ${courses.length} Kurse der Turnabteilung sind aktiv.</p>
+                </div>
+            `;
+        } else {
+            summaryDiv.innerHTML = `
+                <div class="status-box info">
+                    <h3>ℹ️ Daten vorhanden</h3>
+                    <p>${trainers.length} Trainer und ${courses.length} Kurse gefunden.</p>
+                </div>
+            `;
+        }
+        
+        // Kurse-Tabelle
+        const coursesDiv = document.getElementById('courses');
+        if (courses.length > 0) {
+            let html = '<table><tr><th>Kurs</th><th>Tag</th><th>Zeit</th><th>Ort</th><th>Trainer</th><th>Status</th></tr>';
+            courses.forEach(course => {
+                const assigned = course.assignedTrainerIds?.length || 0;
+                const required = course.requiredTrainers || 2;
+                let statusClass = 'status-optimal';
+                let statusText = 'Optimal';
+                if (assigned === 0) {
+                    statusClass = 'status-critical';
+                    statusText = 'Kritisch';
+                } else if (assigned < required) {
+                    statusClass = 'status-warning';
+                    statusText = `${required - assigned} fehlt`;
+                }
+                
+                const trainerNames = (course.assignedTrainerIds || []).map(id => {
+                    const trainer = trainers.find(t => t.id === id);
+                    return trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unbekannt';
+                }).join(', ');
+                
+                html += `<tr>
+                    <td><strong>${course.name}</strong></td>
+                    <td>${course.dayOfWeek}</td>
+                    <td>${course.startTime}-${course.endTime || '?'}</td>
+                    <td>${course.location || '-'}</td>
+                    <td>${trainerNames || 'Keine'}</td>
+                    <td><span class="course-status ${statusClass}">${statusText}</span></td>
+                </tr>`;
+            });
+            html += '</table>';
+            coursesDiv.innerHTML = html;
+        } else {
+            coursesDiv.innerHTML = '<p class="status-box warning">Keine Kurse vorhanden</p>';
+        }
+        
+        // Trainer-Liste
+        const trainersDiv = document.getElementById('trainers');
+        if (trainers.length > 0) {
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">';
+            trainers.forEach(trainer => {
+                html += `
+                    <div style="border: 1px solid #e5e7eb; padding: 10px; border-radius: 8px; flex: 1; min-width: 250px;">
+                        <strong>${trainer.firstName} ${trainer.lastName}</strong><br>
+                        <small>${trainer.email || 'Keine E-Mail'}</small><br>
+                        <div style="margin-top: 5px;">
+                            ${(trainer.availability || []).map(day => 
+                                `<span class="trainer-badge">${day}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            trainersDiv.innerHTML = html;
+        } else {
+            trainersDiv.innerHTML = '<p class="status-box warning">Keine Trainer vorhanden</p>';
+        }
+    }
+    
+    function exportData() {
+        const data = {
+            courses: JSON.parse(localStorage.getItem('tsvrot-courses') || '[]'),
+            trainers: JSON.parse(localStorage.getItem('tsvrot-trainers') || '[]'),
+            sessions: JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]'),
+            exportDate: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tsv-rot-daten-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+    }
+    
+    function clearData() {
+        if (confirm('Wirklich ALLE Daten löschen?')) {
+            localStorage.removeItem('tsvrot-courses');
+            localStorage.removeItem('tsvrot-trainers');
+            localStorage.removeItem('tsvrot-sessions');
+            alert('Alle Daten gelöscht! Die App lädt beim nächsten Start die TSV Rot Daten neu.');
+            location.reload();
+        }
+    }
+    
+    // Beim Laden prüfen
+    checkData();
+    </script>
+</body>
+</html>

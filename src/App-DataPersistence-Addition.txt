@@ -1,0 +1,42 @@
+﻿// Am Anfang von App.jsx hinzufügen:
+import DataPersistence from './utils/DataPersistence';
+
+// In der App Component:
+useEffect(() => {
+  // Daten laden beim Start
+  DataPersistence.loadData().then(data => {
+    if (data) {
+      setTrainers(data.trainers || []);
+      setCourses(data.courses || []);
+      setTrainingSessions(data.sessions || []);
+    }
+  });
+}, []);
+
+// Bei jeder Änderung speichern
+useEffect(() => {
+  const data = {
+    trainers,
+    courses,
+    sessions: trainingSessions
+  };
+  DataPersistence.saveData(data);
+}, [trainers, courses, trainingSessions]);
+
+// Backup-Button in der UI hinzufügen
+const downloadBackup = () => {
+  const data = {
+    trainers,
+    courses,
+    sessions: trainingSessions,
+    exportDate: new Date().toISOString()
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], 
+    { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TSVRot-Backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+};
