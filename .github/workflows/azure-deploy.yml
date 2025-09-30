@@ -17,13 +17,12 @@ jobs:
       with:
         node-version: '18'
         
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Build with npx
-      run: npx vite build
-      
-    - name: Add server.js
+    - name: Install and Build
+      run: |
+        npm ci
+        npx vite build
+        
+    - name: Prepare deployment package
       run: |
         cat > server.js << 'EOF'
         const express = require('express');
@@ -36,14 +35,28 @@ jobs:
         app.listen(process.env.PORT || 8080);
         EOF
         
-    - name: Add start script to package.json
-      run: |
-        npm pkg set scripts.start="node server.js"
-        npm install express --save
+        cat > package.json << 'EOF'
+        {
+          "name": "tsv-rot-app",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "dependencies": {
+            "express": "^4.18.2"
+          }
+        }
+        EOF
+        
+        npm install express --production
+        rm -rf node_modules/.cache
+        rm -rf node_modules/.bin
+        
+    - name: Create deployment artifact
+      run: zip -r deploy.zip dist/ server.js package.json node_modules/express/ -x "*.map" -x "*.md"
       
     - name: Deploy to Azure
       uses: azure/webapps-deploy@v2
       with:
         app-name: 'tsvrot-trainer-2025'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: .
+        package: deploy.zip
