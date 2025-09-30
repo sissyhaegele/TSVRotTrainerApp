@@ -5,275 +5,257 @@ import Trainers from './components/Trainers';
 import StaffingOverview from './components/StaffingOverview';
 import WeeklyView from './components/WeeklyView';
 import TrainingSessions from './components/TrainingSessions';
+import Login from './components/Login';
 
 export default function App() {
-  // Keine Login-Prüfung - App startet direkt mit echten TSV Rot Daten
-  const getInitialCourses = () => {
-    const saved = localStorage.getItem('tsvrot-courses');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Nur verwenden wenn wirklich Daten da sind
-      if (parsed && parsed.length > 0) return parsed;
-    }
-    // ECHTE TSV ROT KURSE - werden automatisch geladen
-    const defaultCourses = [
-      { id: 1, name: "Frauengymnastik", dayOfWeek: "Montag", startTime: "20:00", endTime: "21:00", location: "Multifunktionshalle Rot", category: "Gymnastik", requiredTrainers: 1, assignedTrainerIds: [1] },
-      { id: 2, name: "Aerobic / Dance & mehr", dayOfWeek: "Montag", startTime: "21:00", endTime: "22:00", location: "Multifunktionshalle Rot", category: "Fitness", requiredTrainers: 1, assignedTrainerIds: [2] },
-      { id: 3, name: "Seniorengymnastik", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Multifunktionshalle Rot", category: "Seniorensport", requiredTrainers: 1, assignedTrainerIds: [1] },
-      { id: 4, name: "Turnwichtel (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 4, 5] },
-      { id: 5, name: "Turnzwerge (2-5 Jahre)", dayOfWeek: "Dienstag", startTime: "16:00", endTime: "17:00", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 3, assignedTrainerIds: [3, 6] },
-      { id: 6, name: "Kinderturnen ab 5 Jahre", dayOfWeek: "Freitag", startTime: "15:30", endTime: "16:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [7, 8] },
-      { id: 7, name: "Kinderturnen ab 8 Jahre", dayOfWeek: "Freitag", startTime: "16:30", endTime: "17:30", location: "Parkringhalle", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [8, 9] }
-    ];
-    // Direkt speichern für nächstes Mal
-    localStorage.setItem('tsvrot-courses', JSON.stringify(defaultCourses));
-    return defaultCourses;
-  };
-
-  const getInitialTrainers = () => {
+  // ========== 1. ALLE useState HOOKS ZUERST ==========
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  const [trainers, setTrainers] = useState(() => {
     const saved = localStorage.getItem('tsvrot-trainers');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Nur verwenden wenn wirklich Daten da sind
       if (parsed && parsed.length > 0) return parsed;
     }
-    // ECHTE TSV ROT TRAINER - werden automatisch geladen
-    const defaultTrainers = [
-      { id: 1, firstName: "Irmgard", lastName: "Stegmüller", email: "irmgard.stegmueller@tsvrot.de", phone: "", availability: ["Montag", "Dienstag"], qualifications: ["Frauengymnastik", "Seniorengymnastik", "Pilates"] },
-      { id: 2, firstName: "Ulrike", lastName: "Keßler", email: "ulrike.kessler@tsvrot.de", phone: "", availability: ["Montag"], qualifications: ["Aerobic", "Dance", "Fitness"] },
-      { id: 3, firstName: "Sarah", lastName: "Winkler", email: "sarah.winkler@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
-      { id: 4, firstName: "Desiree", lastName: "Knopf", email: "desiree.knopf@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
-      { id: 5, firstName: "Julia", lastName: "Miller", email: "julia.miller@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
-      { id: 6, firstName: "Sabrina", lastName: "Gund", email: "sabrina.gund@tsvrot.de", phone: "", availability: ["Dienstag"], qualifications: ["Kinderturnen", "Eltern-Kind-Turnen"] },
-      { id: 7, firstName: "Josef", lastName: "Kahlenberg", email: "josef.kahlenberg@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
-      { id: 8, firstName: "Jasmin", lastName: "Ittensohn", email: "jasmin.ittensohn@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen"] },
-      { id: 9, firstName: "Marvin Arne", lastName: "Vögeli", email: "marvin.voegeli@tsvrot.de", phone: "", availability: ["Freitag"], qualifications: ["Kinderturnen", "Geräteturnen", "Fitness"] }
+    return [
+      { id: 1, firstName: "Irmgard", lastName: "Stegmueller", email: "irmgard.stegmueller@tsvrot.de", phone: "" },
+      { id: 2, firstName: "Ulrike", lastName: "Kessler", email: "ulrike.kessler@tsvrot.de", phone: "" },
+      { id: 3, firstName: "Sarah", lastName: "Winkler", email: "sarah.winkler@tsvrot.de", phone: "" },
+      { id: 4, firstName: "Desiree", lastName: "Knopf", email: "desiree.knopf@tsvrot.de", phone: "" },
+      { id: 5, firstName: "Julia", lastName: "Miller", email: "julia.miller@tsvrot.de", phone: "" },
+      { id: 6, firstName: "Sabrina", lastName: "Gund", email: "sabrina.gund@tsvrot.de", phone: "" },
+      { id: 7, firstName: "Josef", lastName: "Kahlenberg", email: "josef.kahlenberg@tsvrot.de", phone: "" },
+      { id: 8, firstName: "Jasmin", lastName: "Ittensohn", email: "jasmin.ittensohn@tsvrot.de", phone: "" },
+      { id: 9, firstName: "Marvin", lastName: "Voegeli", email: "marvin.voegeli@tsvrot.de", phone: "" }
     ];
-    // Direkt speichern für nächstes Mal
-    localStorage.setItem('tsvrot-trainers', JSON.stringify(defaultTrainers));
-    return defaultTrainers;
-  };
-
-  const [courses, setCourses] = useState(getInitialCourses);
-  const [trainers, setTrainers] = useState(getInitialTrainers);
-
+  });
+  
+  const [courses, setCourses] = useState(() => {
+    const saved = localStorage.getItem('tsvrot-courses');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.length > 0) return parsed;
+    }
+    return [
+      { id: 1, name: "Frauengymnastik", dayOfWeek: "Montag", startTime: "20:00", endTime: "21:00", location: "Multifunktionshalle Rot", category: "Gymnastik", requiredTrainers: 1, assignedTrainerIds: [1] },
+      { id: 2, name: "Aerobic / Dance & mehr", dayOfWeek: "Montag", startTime: "21:00", endTime: "22:00", location: "Multifunktionshalle Rot", category: "Fitness", requiredTrainers: 1, assignedTrainerIds: [2] },
+      { id: 3, name: "Seniorengymnastik", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Multifunktionshalle Rot", category: "Senioren", requiredTrainers: 1, assignedTrainerIds: [1] },
+      { id: 4, name: "Turnwichtel (4-6 Jahre)", dayOfWeek: "Dienstag", startTime: "15:00", endTime: "16:00", location: "Schulturnhalle Rot", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [3, 4] },
+      { id: 5, name: "Turnzwerge (2-4 Jahre)", dayOfWeek: "Dienstag", startTime: "16:00", endTime: "17:00", location: "Schulturnhalle Rot", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [3, 4] },
+      { id: 6, name: "Kinderturnen ab 5 Jahre", dayOfWeek: "Freitag", startTime: "15:30", endTime: "16:30", location: "Schulturnhalle Rot", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [5, 6] },
+      { id: 7, name: "Kinderturnen ab 8 Jahre", dayOfWeek: "Freitag", startTime: "16:30", endTime: "17:30", location: "Schulturnhalle Rot", category: "Kinderturnen", requiredTrainers: 2, assignedTrainerIds: [5, 6] }
+    ];
+  });
+  
   const [trainingSessions, setTrainingSessions] = useState(() => {
     const saved = localStorage.getItem('tsvrot-sessions');
     return saved ? JSON.parse(saved) : [];
   });
-
-  const [activeTab, setActiveTab] = useState('overview');
-  const [adminMode, setAdminMode] = useState(true); // Admin-Modus standardmäßig aktiv
+  
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('tsvrot-activeTab') || 'trainers';
+  });
+  
+  const [adminMode, setAdminMode] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Speichern bei Änderungen
+  // ========== 2. ALLE useEffect HOOKS ==========
   useEffect(() => {
-    localStorage.setItem('tsvrot-courses', JSON.stringify(courses));
-  }, [courses]);
+    const loggedIn = localStorage.getItem('tsvrot-isLoggedIn');
+    const role = localStorage.getItem('tsvrot-role');
+    if (loggedIn === 'true') {
+      setIsLoggedIn(true);
+      setUserRole(role || 'trainer');
+      setAdminMode(role === 'admin');
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('tsvrot-trainers', JSON.stringify(trainers));
   }, [trainers]);
 
   useEffect(() => {
+    localStorage.setItem('tsvrot-courses', JSON.stringify(courses));
+  }, [courses]);
+
+  useEffect(() => {
     localStorage.setItem('tsvrot-sessions', JSON.stringify(trainingSessions));
   }, [trainingSessions]);
 
-  const navigation = [
-    { id: 'overview', label: 'Besetzungsübersicht', icon: BarChart3 },
-    { id: 'weekly', label: 'Wochenplan', icon: Calendar },
-    { id: 'courses', label: 'Kurse', icon: Users },
-    { id: 'trainers', label: 'Trainer', icon: Users },
-    { id: 'sessions', label: 'Trainingseinheiten', icon: Calendar },
-  ];
+  useEffect(() => {
+    localStorage.setItem('tsvrot-activeTab', activeTab);
+  }, [activeTab]);
 
+  // ========== 3. FUNKTIONEN ==========
+  const handleLogin = (role) => {
+    setIsLoggedIn(true);
+    setUserRole(role);
+    setAdminMode(role === 'admin');
+    localStorage.setItem('tsvrot-isLoggedIn', 'true');
+    localStorage.setItem('tsvrot-role', role);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserRole('');
+    setAdminMode(false);
+    localStorage.removeItem('tsvrot-isLoggedIn');
+    localStorage.removeItem('tsvrot-role');
+  };
+
+  // ========== 4. LOGIN CHECK ==========
+  if (!isLoggedIn) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  // ========== 5. BERECHTIGUNGEN ==========
+  const canEdit = userRole === 'admin';
+  const canAssignTrainers = userRole === 'admin' || userRole === 'trainer';
+
+  // ========== 6. RENDER ==========
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - Mobile optimiert */}
-      <header className="bg-red-600 text-white shadow-lg sticky top-0 z-50">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-3 sm:py-4">
-            <div className="flex items-center space-x-3">
+      {/* Header mit Logout */}
+      <div className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-red-600">TSV Rot Trainer-Verwaltung</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">
+            {userRole === 'admin' ? 'Administrator' : 'Trainer'}
+          </span>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+          >
+            Abmelden
+          </button>
+        </div>
+      </div>
+      
+      <div className="flex h-screen pt-14">
+        {/* Sidebar */}
+        <div className="w-64 bg-white shadow-lg">
+          <nav className="mt-5 px-2">
+            <button
+              onClick={() => setActiveTab('trainers')}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                activeTab === 'trainers' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="mr-3 h-5 w-5" />
+              Trainer
+            </button>
+            <button
+              onClick={() => setActiveTab('courses')}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'courses' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Kurse
+            </button>
+            <button
+              onClick={() => setActiveTab('weekly-plan')}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'weekly-plan' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Wochenplan
+            </button>
+            <button
+              onClick={() => setActiveTab('staffing')}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'staffing' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 className="mr-3 h-5 w-5" />
+              Besetzung
+            </button>
+            <button
+              onClick={() => setActiveTab('sessions')}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'sessions' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Trainingseinheiten
+            </button>
+            {canEdit && (
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="sm:hidden p-2 rounded-md hover:bg-red-700"
+                onClick={() => setActiveTab('admin')}
+                className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-8 ${
+                  activeTab === 'admin' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+                }`}
               >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                <Settings className="mr-3 h-5 w-5" />
+                Admin
               </button>
-              <div>
-                <h1 className="text-lg sm:text-xl font-bold">TSV 1905 Rot</h1>
-                <p className="text-xs opacity-90 hidden sm:block">Turnabteilung - Trainer & Kurse</p>
-              </div>
-            </div>
-            
-            {/* Admin Toggle - Mobile optimiert */}
-            <div className="flex items-center space-x-2 text-sm">
-              <label className="flex items-center space-x-1 bg-red-700 px-2 py-1 rounded">
-                <input
-                  type="checkbox"
-                  checked={adminMode}
-                  onChange={(e) => setAdminMode(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="hidden sm:inline">Admin</span>
-                <Settings className="w-4 h-4 sm:hidden" />
-              </label>
-              
-              {adminMode && (
-                <label className="hidden sm:flex items-center space-x-2">
+            )}
+          </nav>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto p-8">
+          {activeTab === 'trainers' && (
+            <Trainers
+              trainers={trainers}
+              setTrainers={setTrainers}
+              deleteMode={deleteMode}
+              adminMode={adminMode}
+              canEdit={canEdit}
+            />
+          )}
+          {activeTab === 'courses' && (
+            <Courses
+              courses={courses}
+              setCourses={setCourses}
+              trainers={trainers}
+              deleteMode={deleteMode}
+              adminMode={adminMode}
+              canEdit={canEdit}
+              canAssignTrainers={canAssignTrainers}
+            />
+          )}
+          {activeTab === 'weekly-plan' && (
+            <WeeklyView
+              courses={courses}
+              trainers={trainers}
+              canAssignTrainers={canAssignTrainers}
+            />
+          )}
+          {activeTab === 'staffing' && (
+            <StaffingOverview
+              courses={courses}
+              trainingSessions={trainingSessions}
+            />
+          )}
+          {activeTab === 'sessions' && (
+            <TrainingSessions
+              trainingSessions={trainingSessions}
+              setTrainingSessions={setTrainingSessions}
+              courses={courses}
+              trainers={trainers}
+              adminMode={adminMode}
+            />
+          )}
+          {activeTab === 'admin' && canEdit && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-4">Admin Einstellungen</h2>
+              <div className="space-y-4">
+                <label className="flex items-center">
                   <input
                     type="checkbox"
                     checked={deleteMode}
                     onChange={(e) => setDeleteMode(e.target.checked)}
-                    className="rounded"
+                    className="mr-2"
                   />
-                  <span className="text-sm">Löschen</span>
+                  <span>Löschmodus aktivieren</span>
                 </label>
-              )}
+              </div>
             </div>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <nav className="hidden sm:flex space-x-2 sm:space-x-4 pb-3 overflow-x-auto">
-            {navigation.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${
-                  activeTab === item.id
-                    ? 'bg-red-700 text-white'
-                    : 'text-red-100 hover:bg-red-500 hover:text-white'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
+          )}
         </div>
-        
-        {/* Mobile Navigation Dropdown */}
-        {mobileMenuOpen && (
-          <nav className="sm:hidden border-t border-red-500 px-4 pb-3">
-            <div className="space-y-1">
-              {navigation.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center space-x-3 w-full px-3 py-3 rounded-md text-base font-medium ${
-                    activeTab === item.id
-                      ? 'bg-red-700 text-white'
-                      : 'text-red-100 hover:bg-red-500 hover:text-white'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-              {adminMode && (
-                <button
-                  onClick={() => {
-                    setDeleteMode(!deleteMode);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 w-full px-3 py-3 rounded-md text-base font-medium text-red-100 hover:bg-red-500"
-                >
-                  <Settings className="w-5 h-5" />
-                  <span>Löschmodus: {deleteMode ? 'An' : 'Aus'}</span>
-                </button>
-              )}
-            </div>
-          </nav>
-        )}
-      </header>
-
-      {/* Main Content - Mobile optimiert mit weniger Padding */}
-      <main className="px-4 sm:px-6 lg:px-8 py-4 sm:py-8 max-w-7xl mx-auto">
-        {activeTab === 'overview' && (
-          <StaffingOverview 
-            courses={courses} 
-            trainingSessions={trainingSessions} 
-          />
-        )}
-        
-        {activeTab === 'weekly' && (
-          <WeeklyView 
-            courses={courses}
-            trainers={trainers}
-            setCourses={setCourses}
-          />
-        )}
-        
-        {activeTab === 'courses' && (
-          <Courses
-            courses={courses}
-            setCourses={setCourses}
-            trainers={trainers}
-            deleteMode={deleteMode}
-            adminMode={adminMode}
-          />
-        )}
-        
-        {activeTab === 'trainers' && (
-          <Trainers
-            trainers={trainers}
-            setTrainers={setTrainers}
-            deleteMode={deleteMode}
-            adminMode={adminMode}
-          />
-        )}
-        
-        {activeTab === 'sessions' && (
-          <TrainingSessions
-            sessions={trainingSessions}
-            setSessions={setTrainingSessions}
-            courses={courses}
-            trainers={trainers}
-            deleteMode={deleteMode}
-            adminMode={adminMode}
-          />
-        )}
-      </main>
-      
-      {/* Mobile Bottom Navigation für wichtigste Funktionen */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
-        <div className="grid grid-cols-3 gap-1">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`flex flex-col items-center py-2 ${
-              activeTab === 'overview' ? 'text-red-600' : 'text-gray-500'
-            }`}
-          >
-            <BarChart3 className="w-5 h-5" />
-            <span className="text-xs mt-1">Übersicht</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('weekly')}
-            className={`flex flex-col items-center py-2 ${
-              activeTab === 'weekly' ? 'text-red-600' : 'text-gray-500'
-            }`}
-          >
-            <Calendar className="w-5 h-5" />
-            <span className="text-xs mt-1">Wochenplan</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('courses')}
-            className={`flex flex-col items-center py-2 ${
-              activeTab === 'courses' ? 'text-red-600' : 'text-gray-500'
-            }`}
-          >
-            <Users className="w-5 h-5" />
-            <span className="text-xs mt-1">Kurse</span>
-          </button>
-        </div>
-      </nav>
-      
-      {/* Padding für Bottom Navigation auf Mobile */}
-      <div className="h-16 sm:hidden"></div>
+      </div>
     </div>
   );
 }

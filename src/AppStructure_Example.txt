@@ -1,0 +1,51 @@
+﻿export default function App() {
+  // 1. ALLE useState hooks ZUERST
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  const [trainers, setTrainers] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [trainingSessions, setTrainingSessions] = useState([]);
+  const [activeTab, setActiveTab] = useState('trainers');
+  const [adminMode, setAdminMode] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
+  
+  // 2. ALLE useEffect hooks DANACH
+  useEffect(() => {
+    const loggedIn = localStorage.getItem('tsvrot-isLoggedIn');
+    const role = localStorage.getItem('tsvrot-role');
+    if (loggedIn === 'true') {
+      setIsLoggedIn(true);
+      setUserRole(role || 'trainer');
+    }
+  }, []);
+  
+  useEffect(() => {
+    // Daten laden
+    const savedTrainers = localStorage.getItem('tsvrot-trainers');
+    if (savedTrainers) setTrainers(JSON.parse(savedTrainers));
+    
+    const savedCourses = localStorage.getItem('tsvrot-courses');
+    if (savedCourses) setCourses(JSON.parse(savedCourses));
+  }, []);
+  
+  // 3. Funktionen
+  const handleLogin = (role) => {
+    setIsLoggedIn(true);
+    setUserRole(role);
+  };
+  
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserRole('');
+    localStorage.removeItem('tsvrot-isLoggedIn');
+    localStorage.removeItem('tsvrot-role');
+  };
+  
+  // 4. JETZT ERST der Login-Check
+  if (!isLoggedIn) {
+    return <Login onLogin={handleLogin} />;
+  }
+  
+  // 5. Rest der App...
+  const canEdit = userRole === 'admin';
+  const canAssignTrainers = userRole === 'admin' || userRole === 'trainer';
