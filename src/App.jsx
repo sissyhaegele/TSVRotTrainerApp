@@ -162,15 +162,7 @@ export default function App() {
               <Calendar className="mr-3 h-5 w-5" />
               Wochenplan
             </button>
-            <button
-              onClick={() => setActiveTab('staffing')}
-              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
-                activeTab === 'staffing' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <BarChart3 className="mr-3 h-5 w-5" />
-              Besetzung
-            </button>
+            
             {canEdit && (
               <button
                 onClick={() => setActiveTab('admin')}
@@ -214,11 +206,7 @@ export default function App() {
               canAssignTrainers={canAssignTrainers}
               setCourses={setCourses}
             />
-          )}
-          {activeTab === 'staffing' && (
-            <StaffingOverview
-              courses={courses}
-              />
+        
           )}
           
           {activeTab === 'admin' && canEdit && (
