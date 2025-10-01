@@ -1,36 +1,29 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 package-lock.json
 
-# Build & Cache
+# Build
 dist/
-dist-ssr/
-*.local
-.vite/
+build/
 
-# Editor directories
+# Environment
+.env
+.env.local
+
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
-.env.production
+# Backups
+*.backup
+*.bak
+*.tmp
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Test files
-*.bat
-*.ps1
-startup.json
-SCHNELLSTART.txt
-INFO-*.txt

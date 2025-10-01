@@ -212,6 +212,7 @@ export default function App() {
               courses={courses}
               trainers={trainers}
               canAssignTrainers={canAssignTrainers}
+              setCourses={setCourses}
             />
           )}
           {activeTab === 'staffing' && (
