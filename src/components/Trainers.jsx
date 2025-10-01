@@ -268,7 +268,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">VerfÃƒÆ’Ã‚Â¼gbarkeit:</h4>
+                  <h4 className="font-medium mb-2">Verfügbarkeit:</h4>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => (
                       <label key={day} className="flex items-center">

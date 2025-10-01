@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
 const WeeklyView = ({ courses, trainers, setCourses }) => {
@@ -6,7 +6,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [selectedDay, setSelectedDay] = useState('Alle');
   const [currentWeek, setCurrentWeek] = useState(new Date());
   
-  // NEU: State für Ausfälle und Ferien
+  // State für Ausfälle und Ferien
   const [cancelledCourses, setCancelledCourses] = useState(() => {
     const saved = localStorage.getItem('tsvrot-cancelled-courses');
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -17,102 +17,130 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
   
+  // Wochenspezifische Trainer-Zuweisungen
+  const [weeklyAssignments, setWeeklyAssignments] = useState(() => {
+    const saved = localStorage.getItem('tsvrot-weekly-assignments');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Speichern bei Änderungen
+  useEffect(() => {
+    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
+  }, [weeklyAssignments]);
+
   const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-// KW berechnen
-const getWeekNumber = (date) => {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
-};
-
-const weekNumber = getWeekNumber(currentWeek);
-const year = currentWeek.getFullYear();
-
-// Woche wechseln
-const changeWeek = (direction) => {
-  const newDate = new Date(currentWeek);
-  newDate.setDate(newDate.getDate() + (direction * 7));
-  setCurrentWeek(newDate);
+  // ===== WICHTIG: Funktionen in korrekter Reihenfolge =====
   
-  // Aktuelle Zuordnungen als Stunden speichern
-  saveWeekHours();
-};
+  // 1. KW berechnen - ZUERST definieren
+  const getWeekNumber = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+  };
 
-// Stunden automatisch speichern (Trainer-Zuordnung = geleistete Stunden)
-const saveWeekHours = async () => {
-  // Für jeden Kurs mit Trainern
-  courses.forEach(course => {
-    // SKIP ausgefallene Kurse
-    if (isCourseCancel(course.id)) {
-      return; // Keine Stunden für ausgefallene Kurse
-    }
-    
-    if (course.assignedTrainerIds?.length > 0) {
-      const hours = calculateHours(course.startTime, course.endTime);
-      
-      course.assignedTrainerIds.forEach(async trainerId => {
-        await fetch('https://tsvrot-api-v2.azurewebsites.net/api/training-sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            week_number: weekNumber,
-            year: year,
-            course_id: course.id,
-            trainer_id: trainerId,
-            hours: hours || 1,
-            status: 'done'
-          })
-        });
-      });
-    }
-  });
-};
+  const weekNumber = getWeekNumber(currentWeek);
+  const year = currentWeek.getFullYear();
 
-const calculateHours = (start, end) => {
-  if (!start || !end) return 1;
-  const [startH, startM] = start.split(':').map(Number);
-  const [endH, endM] = end.split(':').map(Number);
-  return (endH + endM/60) - (startH + startM/60);
-};
-// Berechne konkretes Datum für einen Kurs basierend auf KW und Wochentag
-const getDateForCourse = (dayOfWeek) => {
-  // Finde Montag der aktuellen Woche
-  const date = new Date(currentWeek);
-  const currentDay = date.getDay() || 7; // Sonntag = 7
-  const monday = new Date(date);
-  monday.setDate(date.getDate() - currentDay + 1);
-  
-  // Tage-Index für den Wochentag
-  const dayIndex = {
-    'Montag': 0, 'Dienstag': 1, 'Mittwoch': 2, 
-    'Donnerstag': 3, 'Freitag': 4, 'Samstag': 5, 'Sonntag': 6
+  // 2. Hilfsfunktionen - VOR den Funktionen die sie nutzen
+  const calculateHours = (start, end) => {
+    if (!start || !end) return 1;
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    return (endH + endM/60) - (startH + startM/60);
+  };
+
+  // 3. Wochenspezifische Keys und Getter/Setter
+  const getWeeklyKey = (courseId) => {
+    return `${courseId}-${weekNumber}-${year}`;
+  };
+
+  const getWeeklyTrainers = (course) => {
+    const key = getWeeklyKey(course.id);
+    return weeklyAssignments[key] || course.assignedTrainerIds || [];
   };
   
-  // Berechne finales Datum
-  const courseDate = new Date(monday);
-  courseDate.setDate(monday.getDate() + (dayIndex[dayOfWeek] || 0));
-  
-  return courseDate;
-};
+  const setWeeklyTrainers = (courseId, trainerIds) => {
+    const key = getWeeklyKey(courseId);
+    setWeeklyAssignments(prev => ({
+      ...prev,
+      [key]: trainerIds
+    }));
+  };
 
-// Datum formatieren (z.B. "12.02." oder "12.02.2025")
-const formatDate = (date) => {
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${day}.${month}.`;
-};
+  // 4. Stunden speichern (nutzt calculateHours - jetzt korrekt)
+  const saveWeekHours = async () => {
+    courses.forEach(course => {
+      // SKIP ausgefallene Kurse
+      if (isCourseCancel(course.id)) {
+        return;
+      }
+      
+      const weeklyTrainerIds = getWeeklyTrainers(course);
+      if (weeklyTrainerIds.length > 0) {
+        const hours = calculateHours(course.startTime, course.endTime);
+        
+        weeklyTrainerIds.forEach(async trainerId => {
+          await fetch('https://tsvrot-api-v2.azurewebsites.net/api/training-sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              week_number: weekNumber,
+              year: year,
+              course_id: course.id,
+              trainer_id: trainerId,
+              hours: hours || 1,
+              status: 'done'
+            })
+          });
+        });
+      }
+    });
+  };
 
-// Prüfen ob Kurs ausgefallen ist
+  // 5. Woche wechseln
+  const changeWeek = (direction) => {
+    const newDate = new Date(currentWeek);
+    newDate.setDate(newDate.getDate() + (direction * 7));
+    setCurrentWeek(newDate);
+    
+    // Stunden speichern beim Wechsel
+    saveWeekHours();
+  };
+
+  // 6. Datum-Funktionen
+  const getDateForCourse = (dayOfWeek) => {
+    const date = new Date(currentWeek);
+    const currentDay = date.getDay() || 7;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - currentDay + 1);
+    
+    const dayIndex = {
+      'Montag': 0, 'Dienstag': 1, 'Mittwoch': 2, 
+      'Donnerstag': 3, 'Freitag': 4, 'Samstag': 5, 'Sonntag': 6
+    };
+    
+    const courseDate = new Date(monday);
+    courseDate.setDate(monday.getDate() + (dayIndex[dayOfWeek] || 0));
+    
+    return courseDate;
+  };
+
+  const formatDate = (date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month}.`;
+  };
+
+  // 7. Ausfall-Funktionen
   const isCourseCancel = (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
     const isHoliday = holidayWeeks.has(`${weekNumber}-${year}`);
     return cancelledCourses.has(key) || isHoliday;
   };
 
-  // Einzelnen Kurs ausfallen lassen / reaktivieren
   const toggleCourseCancellation = (courseId, reason = 'Sonstiges') => {
     const key = `${courseId}-${weekNumber}-${year}`;
     const newCancelled = new Set(cancelledCourses);
@@ -127,7 +155,6 @@ const formatDate = (date) => {
     localStorage.setItem('tsvrot-cancelled-courses', JSON.stringify([...newCancelled]));
   };
 
-  // Ganze Woche als Ferien markieren / entfernen
   const toggleHolidayWeek = () => {
     const key = `${weekNumber}-${year}`;
     const newHolidays = new Set(holidayWeeks);
@@ -146,7 +173,7 @@ const formatDate = (date) => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
   };
 
-  // Filter courses by selected day
+  // 8. Filter und Sortierung
   const filteredCourses = React.useMemo(() => {
     let filtered = [...courses];
     
@@ -154,7 +181,6 @@ const formatDate = (date) => {
       filtered = filtered.filter(c => c.dayOfWeek === selectedDay);
     }
     
-    // Sort by day and time
     const dayOrder = { 'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7 };
     filtered.sort((a, b) => {
       const dayDiff = dayOrder[a.dayOfWeek] - dayOrder[b.dayOfWeek];
@@ -165,7 +191,7 @@ const formatDate = (date) => {
     return filtered;
   }, [courses, selectedDay]);
 
-  // Toggle course expansion
+  // 9. UI-Funktionen
   const toggleCourseExpansion = (courseId) => {
     const newExpanded = new Set(expandedCourses);
     if (newExpanded.has(courseId)) {
@@ -176,36 +202,33 @@ const formatDate = (date) => {
     setExpandedCourses(newExpanded);
   };
 
-  // Get trainer name by ID
   const getTrainerName = (trainerId) => {
     const trainer = trainers.find(t => t.id === trainerId);
     return trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unbekannter Trainer';
   };
 
-  // Toggle trainer assignment
   const toggleTrainerAssignment = (courseId, trainerId) => {
-    setCourses(courses.map(course => {
-      if (course.id === courseId) {
-        const currentIds = course.assignedTrainerIds || [];
-        const newIds = currentIds.includes(trainerId)
-          ? currentIds.filter(id => id !== trainerId)
-          : [...currentIds, trainerId];
-        return { ...course, assignedTrainerIds: newIds };
-      }
-      return course;
-    }));
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+    
+    const currentIds = getWeeklyTrainers(course);
+    const newIds = currentIds.includes(trainerId)
+      ? currentIds.filter(id => id !== trainerId)
+      : [...currentIds, trainerId];
+    
+    setWeeklyTrainers(courseId, newIds);
   };
 
-  // Get available trainers for course
   const getAvailableTrainers = (course) => {
+    const weeklyTrainerIds = getWeeklyTrainers(course);
     return trainers.filter(trainer => 
-      !course.assignedTrainerIds?.includes(trainer.id)
+      !weeklyTrainerIds.includes(trainer.id)
     );
   };
 
-  // Get staffing status
   const getStaffingStatus = (course) => {
-    const assigned = course.assignedTrainerIds?.length || 0;
+    const weeklyTrainerIds = getWeeklyTrainers(course);
+    const assigned = weeklyTrainerIds.length;
     const required = course.requiredTrainers || 2;
     
     if (assigned === 0) return { status: 'critical', color: 'red', message: 'Keine Trainer' };
@@ -214,10 +237,11 @@ const formatDate = (date) => {
     return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
   };
 
-return (
-  <div>  {/* Äußerer Container */}
-    {/* KW Navigation mit Ferien-Button */}
-    <div className="mb-3 flex items-center justify-between bg-white p-3 rounded-lg border">
+  // ===== RENDER =====
+  return (
+    <div>
+      {/* KW Navigation mit Ferien-Button */}
+      <div className="mb-3 flex items-center justify-between bg-white p-3 rounded-lg border">
         <button 
           onClick={() => changeWeek(-1)} 
           className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
@@ -235,7 +259,7 @@ return (
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {isHolidayWeek() ? '🏖️ Ferien aktiv' : '🏖️ Als Ferien markieren'}
+            {isHolidayWeek() ? '🖐️ Ferien aktiv' : '🖐️ Als Ferien markieren'}
           </button>
         </div>
         
@@ -247,12 +271,11 @@ return (
         </button>
       </div>
       
-      {/* Header mit Filter - Mobile optimiert */}
+      {/* Header mit Filter */}
       <div className="mb-4 flex flex-col sm:flex-row sm:justify-between gap-3">
         <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
           <Calendar className="w-5 h-5" />
-          <span className="hidden sm:inline">Wochenplan</span>
-          <span className="sm:hidden">Wochenplan</span>
+          <span>Wochenplan</span>
         </h2>
         <select
           value={selectedDay}
@@ -266,16 +289,17 @@ return (
         </select>
       </div>
 
+      {/* Kursliste */}
       <div className="space-y-3">
         {filteredCourses.map(course => {
           const isExpanded = expandedCourses.has(course.id);
           const status = getStaffingStatus(course);
           const bgColor = isCourseCancel(course.id) 
-        ? 'bg-gray-100 border-gray-400 opacity-60' 
-        : status.color === 'red' ? 'bg-red-50 border-red-300' :
-        status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
-        status.color === 'green' ? 'bg-green-50 border-green-300' :
-        'bg-blue-50 border-blue-300';
+            ? 'bg-gray-100 border-gray-400 opacity-60' 
+            : status.color === 'red' ? 'bg-red-50 border-red-300' :
+              status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
+              status.color === 'green' ? 'bg-green-50 border-green-300' :
+              'bg-blue-50 border-blue-300';
 
           return (
             <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
@@ -289,7 +313,8 @@ return (
                     </span>
                   </div>
                 )}
-                {/* Kurs-Header - Mobile optimiert */}
+                
+                {/* Kurs-Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-start gap-2 sm:gap-3">
@@ -304,15 +329,15 @@ return (
                         }
                       </button>
                       <div className="flex-1">
-                        {/* Zeit und Tag prominent MIT DATUM */}
-                      <div className="font-bold text-gray-900 text-sm sm:text-base">
-  {course.dayOfWeek}, {formatDate(getDateForCourse(course.dayOfWeek))} · {course.startTime || '?'}
+                        {/* Zeit und Tag mit Datum */}
+                        <div className="font-bold text-gray-900 text-sm sm:text-base">
+                          {course.dayOfWeek}, {formatDate(getDateForCourse(course.dayOfWeek))} · {course.startTime || '?'}
                         </div>
                         {/* Kursname */}
                         <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
                           {course.name}
                         </div>
-                        {/* Location für Mobile */}
+                        {/* Location */}
                         {course.location && (
                           <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mt-1">
                             <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -328,7 +353,7 @@ return (
                       </div>
                     </div>
 
-                    {/* Status Info - Mobile optimiert */}
+                    {/* Status Info */}
                     <div className="mt-3 ml-8 grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4">
                       <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                         <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -336,11 +361,11 @@ return (
                       </span>
                       <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                         <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                        {course.assignedTrainerIds?.length || 0}/{course.requiredTrainers || 2}
+                        {getWeeklyTrainers(course).length}/{course.requiredTrainers || 2}
                       </span>
                     </div>
 
-                    {/* Status Badge - Mobile optimiert */}
+                    {/* Status Badge */}
                     <div className="mt-3 ml-8">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                         status.color === 'green' ? 'bg-green-100 text-green-800' :
@@ -348,34 +373,34 @@ return (
                         status.color === 'red' ? 'bg-red-100 text-red-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
-                        {status.color === 'green' ? ' ' : 
-                         status.color === 'red' ? ' ' : ''} 
                         {status.message}
                       </span>
                     </div>
 
-                    {/* Zugewiesene Trainer - Mobile optimiert */}
-                    {course.assignedTrainerIds && course.assignedTrainerIds.length > 0 && (
-                      <div className="mt-3 ml-8">
-                        <div className="flex flex-wrap gap-1 sm:gap-2">
-                          {course.assignedTrainerIds.map(trainerId => (
-                            <span key={trainerId} className="inline-flex items-center px-2 py-1 bg-white rounded text-xs sm:text-sm">
-                              <UserCheck className="w-3 h-3 mr-1 text-green-600" />
-                              {getTrainerName(trainerId)}
-                            </span>
-                          ))}
+                    {/* Zugewiesene Trainer */}
+                    {(() => {
+                      const weeklyTrainerIds = getWeeklyTrainers(course);
+                      return weeklyTrainerIds.length > 0 && (
+                        <div className="mt-3 ml-8">
+                          <div className="flex flex-wrap gap-1 sm:gap-2">
+                            {weeklyTrainerIds.map(trainerId => (
+                              <span key={trainerId} className="inline-flex items-center px-2 py-1 bg-white rounded text-xs sm:text-sm">
+                                <UserCheck className="w-3 h-3 mr-1 text-green-600" />
+                                {getTrainerName(trainerId)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* Expanded Section - Mobile optimiert */}
+                {/* Expanded Section */}
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="sm:ml-9">
                       <h4 className="font-medium mb-3 text-sm sm:text-base">Verfügbare Trainer:</h4>
-                      {/* Mobile: 1 Spalte, Desktop: 2 Spalten */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {getAvailableTrainers(course).map(trainer => {
                           const isAvailable = trainer.availability?.includes(course.dayOfWeek);
@@ -395,11 +420,11 @@ return (
                               </div>
                               {isAvailable ? (
                                 <span className="text-xs text-green-600 mt-1 block">
-                                  âœ“ Verfügbar am {course.dayOfWeek}
+                                  Verfügbar am {course.dayOfWeek}
                                 </span>
                               ) : (
                                 <span className="text-xs text-orange-600 mt-1 block">
-                                  âš  Normalerweise nicht {course.dayOfWeek}
+                                  Normalerweise nicht {course.dayOfWeek}
                                 </span>
                               )}
                             </button>
@@ -412,26 +437,29 @@ return (
                         )}
                       </div>
                       
-                  {/* Zugewiesene Trainer entfernen - Mobile optimiert */}
-                      {course.assignedTrainerIds && course.assignedTrainerIds.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="font-medium mb-2 text-sm sm:text-base">Trainer entfernen:</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {course.assignedTrainerIds.map(trainerId => (
-                              <button
-                                key={trainerId}
-                                onClick={() => toggleTrainerAssignment(course.id, trainerId)}
-                                className="inline-flex items-center px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm hover:bg-red-100 touch-manipulation"
-                              >
-                                <UserX className="w-4 h-4 mr-1 text-red-600" />
-                                {getTrainerName(trainerId)}
-                              </button>
-                            ))}
+                      {/* Zugewiesene Trainer entfernen */}
+                      {(() => {
+                        const weeklyTrainerIds = getWeeklyTrainers(course);
+                        return weeklyTrainerIds.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="font-medium mb-2 text-sm sm:text-base">Trainer entfernen:</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {weeklyTrainerIds.map(trainerId => (
+                                <button
+                                  key={trainerId}
+                                  onClick={() => toggleTrainerAssignment(course.id, trainerId)}
+                                  className="inline-flex items-center px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm hover:bg-red-100 touch-manipulation"
+                                >
+                                  <UserX className="w-4 h-4 mr-1 text-red-600" />
+                                  {getTrainerName(trainerId)}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                       
-                      {/* NEU: Kurs ausfallen lassen / reaktivieren */}
+                      {/* Kurs ausfallen lassen / reaktivieren */}
                       <div className="mt-4 pt-4 border-t">
                         <button
                           onClick={() => toggleCourseCancellation(course.id)}
@@ -459,7 +487,6 @@ return (
                           </p>
                         )}
                       </div>
-                      
                     </div>
                   </div>
                 )}
@@ -467,14 +494,16 @@ return (
             </div>
           );
         })}
-       </div>
+      </div>
+
+      {/* Leere-State */}
       {filteredCourses.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
           Keine Kurse für {selectedDay === 'Alle' ? 'diese Auswahl' : selectedDay} vorhanden.
         </div>
       )}
 
-      {/* Legende - Mobile optimiert */}
+      {/* Legende */}
       <div className="mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
         <h3 className="font-semibold text-xs sm:text-sm mb-2">Legende:</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs sm:text-sm">
@@ -501,3 +530,7 @@ return (
 };
 
 export default WeeklyView;
+
+
+
+
