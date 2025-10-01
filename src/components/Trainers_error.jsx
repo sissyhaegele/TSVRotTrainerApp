@@ -26,63 +26,25 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     availability: [],
     qualifications: []
   });
-  const [trainerStats, setTrainerStats] = useState({});
 
-  // Berechne Trainer-Statistiken beim Laden und bei Änderungen
+  // Trainingsstunden aus API laden
   useEffect(() => {
-    calculateTrainerStats();
-  }, [trainers]);
-
-  const calculateTrainerStats = () => {
-    const sessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
-    const stats = {};
-    const currentYear = new Date().getFullYear();
-    
-    trainers.forEach(trainer => {
-      stats[trainer.id] = {
-        totalSessions: 0,
-        presentCount: 0,
-        hoursCompleted: 0,
-        hoursThisMonth: 0,
-        lastSession: null
-      };
-    });
-
-    sessions.forEach(session => {
-      const sessionDate = new Date(session.date);
-      const sessionYear = sessionDate.getFullYear();
-      const isCurrentMonth = sessionDate.getMonth() === new Date().getMonth() && 
-                            sessionYear === currentYear;
-      
-      if (session.attendance) {
-        session.attendance.forEach(att => {
-          if (stats[att.trainerId]) {
-            if (sessionYear === currentYear) {
-              stats[att.trainerId].totalSessions++;
-              
-              if (att.isPresent) {
-                stats[att.trainerId].presentCount++;
-                // Standard: 1 Stunde pro Einheit (kann später angepasst werden)
-                stats[att.trainerId].hoursCompleted++;
-                
-                if (isCurrentMonth) {
-                  stats[att.trainerId].hoursThisMonth++;
-                }
-                
-                // Letzte Anwesenheit tracken
-                if (!stats[att.trainerId].lastSession || 
-                    sessionDate > new Date(stats[att.trainerId].lastSession)) {
-                  stats[att.trainerId].lastSession = session.date;
-                }
-              }
-            }
+    const loadHours = async () => {
+      for (const trainer of trainers) {
+        try {
+          const response = await fetch(`https://tsvrot-api-v2.azurewebsites.net/api/trainer-hours/${trainer.id}/2025`);
+          if (response.ok) {
+            const data = await response.json();
+            setTrainerHours(prev => ({...prev, [trainer.id]: data.total || 0}));
           }
-        });
+        } catch (error) {
+          console.error('Error loading hours for trainer', trainer.id);
+        }
       }
-    });
-
-    setTrainerStats(stats);
-  };
+    };
+    loadHours();
+  }, [trainers]);
+  
 
   const daysOfWeek = [
     'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 
@@ -91,7 +53,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
 
   const qualificationOptions = [
     'Kinderturnen', 'Fitness', 'Yoga', 'Pilates', 
-    'Gymnastik', 'Seniorensport', 'Geräteturnen'
+    'Gymnastik', 'Seniorensport', 'GerÃ¤teturnen'
   ];
 
   const addTrainer = () => {
@@ -155,7 +117,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     <div className="space-y-6">
       {adminMode && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Trainer hinzufügen</h2>
+          <h2 className="text-xl font-semibold mb-4">Trainer hinzufÃ¼gen</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
@@ -192,7 +154,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
           </div>
 
           <div className="mt-4">
-            <h3 className="font-medium mb-2">Verfügbarkeit:</h3>
+            <h3 className="font-medium mb-2">VerfÃ¼gbarkeit:</h3>
             <div className="flex flex-wrap gap-2">
               {daysOfWeek.map(day => (
                 <label key={day} className="flex items-center">
@@ -230,7 +192,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
             className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Trainer hinzufügen
+            Trainer hinzufÃ¼gen
           </button>
         </div>
       )}
@@ -268,7 +230,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">VerfÃƒÆ’Ã‚Â¼gbarkeit:</h4>
+                  <h4 className="font-medium mb-2">VerfÃ¼gbarkeit:</h4>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => (
                       <label key={day} className="flex items-center">
@@ -331,14 +293,14 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                         </div>
                       )}
                       {trainer.phone && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="w-4 h-4 mr-2" />
-                          {trainer.phone}
-                        </div>
-                      )}
+  <div className="flex items-center text-sm text-gray-600">
+    <Phone className="w-4 h-4 mr-2" />
+    {trainer.phone}
+  </div>
+)}
                     </div>
-                  </div>
-                  
+                  </div>    
+                         
                   {adminMode && (
                     <div className="flex space-x-2">
                       <button
@@ -355,45 +317,26 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
-                    </div>
+                                      
+</div>
                   )}
                 </div>
 
                 {/* NEU: Stunden-Statistik prominent anzeigen */}
-                <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-3 mb-3 border border-blue-100">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {trainerHours[trainer.id] || 0}
-                      </div>
-                      <div className="text-xs text-gray-600 flex items-center justify-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Stunden
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xl sm:text-2xl font-bold text-green-600">
-                        {trainerStats[trainer.id]?.presentCount || 0}
-                      </div>
-                      <div className="text-xs text-gray-600 flex items-center justify-center">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Einheiten
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xl sm:text-2xl font-bold text-gray-600">
-                        {trainerStats[trainer.id]?.totalSessions > 0 
-                          ? Math.round((trainerStats[trainer.id].presentCount / trainerStats[trainer.id].totalSessions) * 100)
-                          : 100}%
-                      </div>
-                      <div className="text-xs text-gray-600">Quote</div>
-                    </div>
-                  </div>
+                {/* Vereinfachte Statistik aus DB */}
+<div className="bg-blue-50 rounded-lg p-3 mb-3 border border-blue-200">
+  <div className="flex items-center justify-between">
+    <span className="text-sm font-medium text-gray-700">Geleistete Stunden 2025</span>
+    <span className="text-xl font-bold text-blue-600">
+      {trainerHours[trainer.id] ? trainerHours[trainer.id].toFixed(1) : '0.0'}h
+    </span>
+  </div>
+</div>
                   <div className="mt-2 pt-2 border-t border-blue-100">
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>
                         <TrendingUp className="w-3 h-3 inline mr-1" />
-                        Diesen Monat: {trainerStats[trainer.id]?.hoursThisMonth || 0} Std.
+                        Diesen Monat: {Math.round((trainerHours[trainer.id] || 0) / 12)} Std.
                       </span>
                       <span>{new Date().getFullYear()}</span>
                     </div>
@@ -404,7 +347,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   <div className="mb-3">
                     <div className="flex items-center text-sm font-medium text-gray-700 mb-1">
                       <Calendar className="w-4 h-4 mr-1" />
-                      Verfügbarkeit:
+                      VerfÃ¼gbarkeit:
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {trainer.availability.map(day => (
@@ -439,9 +382,11 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
 
       {trainers.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
-          Noch keine Trainer angelegt. Fügen Sie oben Ihren ersten Trainer hinzu!
-        </div>
+          Noch keine Trainer angelegt. FÃ¼gen Sie oben Ihren ersten Trainer hinzu!
+                          
+</div>
       )}
     </div>
   );
 }
+

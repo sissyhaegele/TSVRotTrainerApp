@@ -9,7 +9,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 
-export default function StaffingOverview({ courses, trainingSessions }) {
+export default function StaffingOverview({ courses }) {
   const [staffingAnalysis, setStaffingAnalysis] = useState([]);
 
   useEffect(() => {
@@ -21,15 +21,7 @@ export default function StaffingOverview({ courses, trainingSessions }) {
       const requiredTrainers = course.requiredTrainers || 2;
       const assignedTrainerIds = course.assignedTrainerIds || [];
       
-      const latestSession = trainingSessions
-        .filter(s => s.courseId === course.id)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-      
-      const presentTrainerIds = latestSession?.attendance
-        ?.filter(a => a.isPresent)
-        ?.map(a => a.trainerId) || [];
-
-      const assignedCount = assignedTrainerIds.length;
+      const presentTrainerIds = [];const assignedCount = assignedTrainerIds.length;
       const presentCount = presentTrainerIds.length;
       const deltaAssigned = assignedCount - requiredTrainers;
       const deltaPresent = presentCount - requiredTrainers;
@@ -168,11 +160,11 @@ export default function StaffingOverview({ courses, trainingSessions }) {
               <div className="flex-1">
                 <h3 className="text-base sm:text-lg font-semibold">{course.name}</h3>
                 <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                  {course.dayOfWeek} • {course.startTime} - {course.endTime}
+                  {course.dayOfWeek} â€¢ {course.startTime} - {course.endTime}
                 </p>
                 {course.location && (
                   <p className="text-xs text-gray-500 mt-1">
-                    📍 {course.location}
+                    ðŸ“ {course.location}
                   </p>
                 )}
               </div>
@@ -217,7 +209,7 @@ export default function StaffingOverview({ courses, trainingSessions }) {
                   Letzte Einheit: {new Date(lastSessionDate).toLocaleDateString('de-DE')}
                   {presentCount !== null && (
                     <span className="ml-2">
-                      • {presentCount} Trainer anwesend
+                      â€¢ {presentCount} Trainer anwesend
                     </span>
                   )}
                 </p>
@@ -235,13 +227,13 @@ export default function StaffingOverview({ courses, trainingSessions }) {
           </h3>
           <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-yellow-800">
             {stats.critical > 0 && (
-              <li>• {stats.critical} Kurse haben keine Trainer zugewiesen - dringend Trainer zuweisen!</li>
+              <li>â€¢ {stats.critical} Kurse haben keine Trainer zugewiesen - dringend Trainer zuweisen!</li>
             )}
             {stats.understaffed > 0 && (
-              <li>• {stats.understaffed} Kurse sind unterbesetzt - zusätzliche Trainer rekrutieren oder Vertretungen organisieren</li>
+              <li>â€¢ {stats.understaffed} Kurse sind unterbesetzt - zusätzliche Trainer rekrutieren oder Vertretungen organisieren</li>
             )}
             {stats.totalDelta < 0 && (
-              <li>• Insgesamt fehlen {Math.abs(stats.totalDelta)} Trainer - Personalbedarf prüfen</li>
+              <li>â€¢ Insgesamt fehlen {Math.abs(stats.totalDelta)} Trainer - Personalbedarf prüfen</li>
             )}
           </ul>
         </div>
@@ -255,3 +247,4 @@ export default function StaffingOverview({ courses, trainingSessions }) {
     </div>
   );
 }
+

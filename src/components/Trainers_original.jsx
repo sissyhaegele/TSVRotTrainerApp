@@ -17,7 +17,6 @@ import {
 
 export default function Trainers({ trainers, setTrainers, deleteMode, adminMode }) {
   const [editingTrainer, setEditingTrainer] = useState(null);
-  const [trainerHours, setTrainerHours] = useState({});
   const [newTrainer, setNewTrainer] = useState({
     firstName: '',
     lastName: '',
@@ -268,7 +267,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">VerfÃƒÆ’Ã‚Â¼gbarkeit:</h4>
+                  <h4 className="font-medium mb-2">Verfügbarkeit:</h4>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => (
                       <label key={day} className="flex items-center">
@@ -364,7 +363,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {trainerHours[trainer.id] || 0}
+                        {trainerStats[trainer.id]?.hoursCompleted || 0}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />

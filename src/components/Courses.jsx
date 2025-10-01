@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Calendar, Users, Clock, MapPin, Tag, Plus, Trash2, Edit, Save, X, AlertTriangle, UserCheck } from 'lucide-react';
 
 export default function Courses({ courses, setCourses, trainers, deleteMode, adminMode, canEdit, canAssignTrainers }) {

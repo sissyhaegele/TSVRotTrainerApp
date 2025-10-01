@@ -4,6 +4,7 @@ import Courses from './components/Courses';
 import Trainers from './components/Trainers';
 import StaffingOverview from './components/StaffingOverview';
 import WeeklyView from './components/WeeklyView';
+import TrainingSessions from './components/TrainingSessions';
 import Login from './components/Login';
 
 export default function App() {
@@ -46,6 +47,11 @@ export default function App() {
     ];
   });
   
+  const [trainingSessions, setTrainingSessions] = useState(() => {
+    const saved = localStorage.getItem('tsvrot-sessions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('tsvrot-activeTab') || 'trainers';
   });
@@ -72,6 +78,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tsvrot-courses', JSON.stringify(courses));
   }, [courses]);
+
+  useEffect(() => {
+    localStorage.setItem('tsvrot-sessions', JSON.stringify(trainingSessions));
+  }, [trainingSessions]);
 
   useEffect(() => {
     localStorage.setItem('tsvrot-activeTab', activeTab);
@@ -123,20 +133,28 @@ export default function App() {
       </div>
       
       <div className="flex h-screen pt-14">
-                {/* Mobile Menu Button */}
+        {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden fixed top-20 left-4 z-50 p-2 bg-red-600 text-white rounded-md shadow-lg"
+          className="lg:hidden fixed top-16 left-4 z-50 p-2 bg-white rounded-md shadow-lg"
         >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {mobileMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
         </button>
-        
         {/* Sidebar */}
-                {/* Sidebar */}
-        <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-64 bg-white shadow-lg absolute lg:relative h-full z-40`}>
+        <div className={`${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 fixed lg:relative w-64 bg-white shadow-lg h-full z-40 transition-transform duration-300`}>
           <nav className="mt-5 px-2">
             <button
               onClick={() => setActiveTab('trainers')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
                 activeTab === 'trainers' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -146,6 +164,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('courses')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
                 activeTab === 'courses' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -155,6 +177,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('weekly-plan')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
                 activeTab === 'weekly-plan' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -164,6 +190,10 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('staffing')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
                 activeTab === 'staffing' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -171,9 +201,26 @@ export default function App() {
               <BarChart3 className="mr-3 h-5 w-5" />
               Besetzung
             </button>
+            <button
+              onClick={() => setActiveTab('sessions')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'sessions' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Trainingseinheiten
+            </button>
             {canEdit && (
               <button
                 onClick={() => setActiveTab('admin')}
+              onClick={() => {
+                setActiveTab($2);
+                setMobileMenuOpen(false);
+              }}
                 className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-8 ${
                   activeTab === 'admin' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
                 }`}
@@ -186,7 +233,7 @@ export default function App() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 lg:ml-0 ml-0">
           {activeTab === 'trainers' && (
             <Trainers
               trainers={trainers}
@@ -217,9 +264,18 @@ export default function App() {
           {activeTab === 'staffing' && (
             <StaffingOverview
               courses={courses}
-              />
+              trainingSessions={trainingSessions}
+            />
           )}
-          
+          {activeTab === 'sessions' && (
+            <TrainingSessions
+              trainingSessions={trainingSessions}
+              setTrainingSessions={setTrainingSessions}
+              courses={courses}
+              trainers={trainers}
+              adminMode={adminMode}
+            />
+          )}
           {activeTab === 'admin' && canEdit && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold mb-4">Admin Einstellungen</h2>
@@ -241,6 +297,4 @@ export default function App() {
     </div>
   );
 }
-
-
 

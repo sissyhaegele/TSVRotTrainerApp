@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -26,6 +26,24 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     availability: [],
     qualifications: []
   });
+
+  // Trainingsstunden aus API laden
+  useEffect(() => {
+    const loadHours = async () => {
+      for (const trainer of trainers) {
+        try {
+          const response = await fetch(`https://tsvrot-api-v2.azurewebsites.net/api/trainer-hours/${trainer.id}/2025`);
+          if (response.ok) {
+            const data = await response.json();
+            setTrainerHours(prev => ({...prev, [trainer.id]: data.total || 0}));
+          }
+        } catch (error) {
+          console.error('Error loading hours for trainer', trainer.id);
+        }
+      }
+    };
+    loadHours();
+  }, [trainers]);
   const [trainerStats, setTrainerStats] = useState({});
 
   // Berechne Trainer-Statistiken beim Laden und bei Änderungen
@@ -268,7 +286,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">VerfÃƒÆ’Ã‚Â¼gbarkeit:</h4>
+                  <h4 className="font-medium mb-2">Verfügbarkeit:</h4>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => (
                       <label key={day} className="flex items-center">
@@ -331,14 +349,12 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                         </div>
                       )}
                       {trainer.phone && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="w-4 h-4 mr-2" />
-                          {trainer.phone}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
+  <div className="flex items-center text-sm text-gray-600">
+    <Phone className="w-4 h-4 mr-2" />
+    {trainer.phone}
+  </div>
+)}    
+                         
                   {adminMode && (
                     <div className="flex space-x-2">
                       <button
@@ -355,7 +371,12 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
-                    </div>
+                                      <div className="pt-2 mt-2 border-t">
+                    <span className="text-sm font-medium text-gray-700">
+                      Stunden 2025: {trainerHours[trainer.id] ? trainerHours[trainer.id].toFixed(1) : '0.0'}h
+                    </span>
+                  </div>
+</div>
                   )}
                 </div>
 
@@ -364,7 +385,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {trainerHours[trainer.id] || 0}
+                        {trainerStats[trainer.id]?.hoursCompleted || 0}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />
@@ -440,8 +461,14 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       {trainers.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
           Noch keine Trainer angelegt. Fügen Sie oben Ihren ersten Trainer hinzu!
-        </div>
+                          <div className="pt-2 mt-2 border-t">
+                    <span className="text-sm font-medium text-gray-700">
+                      Stunden 2025: {trainerHours[trainer.id] ? trainerHours[trainer.id].toFixed(1) : '0.0'}h
+                    </span>
+                  </div>
+</div>
       )}
     </div>
   );
 }
+

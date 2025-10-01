@@ -167,8 +167,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                         status.color === 'red' ? 'bg-red-100 text-red-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
-                        {status.color === 'green' ? '✓ ' : 
-                         status.color === 'red' ? '⚠ ' : ''} 
+                        {status.color === 'green' ? 'âœ“ ' : 
+                         status.color === 'red' ? 'âš  ' : ''} 
                         {status.message}
                       </span>
                     </div>
@@ -214,11 +214,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                               </div>
                               {isAvailable ? (
                                 <span className="text-xs text-green-600 mt-1 block">
-                                  ✓ Verfügbar am {course.dayOfWeek}
+                                  âœ“ Verfügbar am {course.dayOfWeek}
                                 </span>
                               ) : (
                                 <span className="text-xs text-orange-600 mt-1 block">
-                                  ⚠ Normalerweise nicht {course.dayOfWeek}
+                                  âš  Normalerweise nicht {course.dayOfWeek}
                                 </span>
                               )}
                             </button>
