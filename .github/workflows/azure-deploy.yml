@@ -17,10 +17,11 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install and Build
-      run: |
-        npm ci
-        npm run build
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build
+      run: npm run build
 
     - name: Create Express Server
       run: |
@@ -35,10 +36,10 @@ jobs:
         });
         
         const PORT = process.env.PORT || 8181;
-        app.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));
+        app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
         EOF
 
-    - name: Create package.json
+    - name: Create production package.json
       run: |
         cat > dist/package.json << 'EOF'
         {
@@ -53,7 +54,7 @@ jobs:
         }
         EOF
 
-    - name: Install production dependencies
+    - name: Install Express in dist
       run: |
         cd dist
         npm install --production
