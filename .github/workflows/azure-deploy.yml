@@ -17,11 +17,10 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build
-      run: npm run build
+    - name: Install and Build
+      run: |
+        npm ci
+        npm run build
 
     - name: Create Express Server
       run: |
@@ -36,10 +35,10 @@ jobs:
         });
         
         const PORT = process.env.PORT || 8181;
-        app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+        app.listen(PORT, () => console.log(`Server on ${PORT}`));
         EOF
 
-    - name: Create production package.json
+    - name: Create package.json
       run: |
         cat > dist/package.json << 'EOF'
         {
@@ -54,19 +53,19 @@ jobs:
         }
         EOF
 
-    - name: Install Express in dist
+    - name: Install Express
       run: |
         cd dist
         npm install --production
 
-    - name: Create deployment zip
+    - name: Create tar.gz
       run: |
         cd dist
-        zip -r ../deploy.zip . -x "*.map"
+        tar -czf ../deploy.tar.gz .
 
-    - name: Deploy to Azure Web App
+    - name: Deploy to Azure
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'tsvrot-trainer-2025'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: deploy.zip
+        package: deploy.tar.gz
