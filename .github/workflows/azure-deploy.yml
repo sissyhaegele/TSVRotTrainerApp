@@ -22,25 +22,25 @@ jobs:
         npm ci
         npm run build
 
-    - name: Create Express Server
+    - name: Prepare deployment files
       run: |
-        cat > dist/server.js << 'EOF'
+        # Server direkt im Root erstellen
+        cat > server.js << 'EOF'
         const express = require('express');
         const path = require('path');
         const app = express();
         
-        app.use(express.static(__dirname));
+        app.use(express.static('dist'));
         app.get('*', (req, res) => {
-          res.sendFile(path.join(__dirname, 'index.html'));
+          res.sendFile(path.join(__dirname, 'dist', 'index.html'));
         });
         
         const PORT = process.env.PORT || 8181;
         app.listen(PORT, () => console.log(`Server on ${PORT}`));
         EOF
-
-    - name: Create package.json
-      run: |
-        cat > dist/package.json << 'EOF'
+        
+        # Package.json im Root
+        cat > package.json << 'EOF'
         {
           "name": "tsvrot-trainer",
           "version": "1.0.0",
@@ -52,23 +52,12 @@ jobs:
           }
         }
         EOF
-
-    - name: Install Express
-      run: |
-        cd dist
-        npm install --production
-
-    - name: Create tar.gz and verify
-      run: |
-        cd dist
-        tar -czf ../deploy.tar.gz .
-        cd ..
-        ls -lh deploy.tar.gz
-        echo "Archive created at: $(pwd)/deploy.tar.gz"
+        
+        npm install express --production
 
     - name: Deploy to Azure
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'tsvrot-trainer-2025'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ${{ github.workspace }}/deploy.tar.gz
+        package: .
