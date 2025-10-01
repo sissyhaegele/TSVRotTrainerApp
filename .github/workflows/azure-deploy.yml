@@ -1,4 +1,4 @@
-﻿name: Deploy to Azure
+name: Deploy TSV Rot Trainer to Azure
 
 on:
   push:
@@ -8,36 +8,42 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
-        
+        node-version: '20'
+
     - name: Install and Build
       run: |
         npm ci
-        npx vite build
-        
-    - name: Prepare deployment package
+        npm run build
+
+    - name: Create Express Server
       run: |
-        cat > server.js << 'EOF'
+        cat > dist/server.js << 'EOF'
         const express = require('express');
         const path = require('path');
         const app = express();
-        app.use(express.static('dist'));
-        app.get('*', (req, res) => {
-          res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-        });
-        app.listen(process.env.PORT || 8080);
-        EOF
         
-        cat > package.json << 'EOF'
+        app.use(express.static(__dirname));
+        app.get('*', (req, res) => {
+          res.sendFile(path.join(__dirname, 'index.html'));
+        });
+        
+        const PORT = process.env.PORT || 8181;
+        app.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));
+        EOF
+
+    - name: Create package.json
+      run: |
+        cat > dist/package.json << 'EOF'
         {
-          "name": "tsv-rot-app",
+          "name": "tsvrot-trainer",
+          "version": "1.0.0",
           "scripts": {
             "start": "node server.js"
           },
@@ -46,16 +52,19 @@ jobs:
           }
         }
         EOF
-        
-        npm install express --production
-        rm -rf node_modules/.cache
-        rm -rf node_modules/.bin
-        
-    - name: Create deployment artifact
-      run: zip -r deploy.zip dist/ server.js package.json node_modules/express/ -x "*.map" -x "*.md"
-      
-    - name: Deploy to Azure
-      uses: azure/webapps-deploy@v2
+
+    - name: Install production dependencies
+      run: |
+        cd dist
+        npm install --production
+
+    - name: Create deployment zip
+      run: |
+        cd dist
+        zip -r ../deploy.zip . -x "*.map"
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
       with:
         app-name: 'tsvrot-trainer-2025'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
