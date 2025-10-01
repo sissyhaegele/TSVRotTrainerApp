@@ -24,13 +24,30 @@ jobs:
 
     - name: Prepare deployment files
       run: |
-        # Server direkt im Root erstellen
         cat > server.js << 'EOF'
         const express = require('express');
         const path = require('path');
         const app = express();
         
-        app.use(express.static('dist'));
+        // MIME-Types explizit setzen
+        express.static.mime.define({
+          'application/javascript': ['js'],
+          'text/css': ['css'],
+          'image/svg+xml': ['svg']
+        });
+        
+        // Static files mit korrekten Headers
+        app.use(express.static('dist', {
+          setHeaders: (res, filePath) => {
+            if (filePath.endsWith('.js')) {
+              res.setHeader('Content-Type', 'application/javascript');
+            } else if (filePath.endsWith('.css')) {
+              res.setHeader('Content-Type', 'text/css');
+            }
+          }
+        }));
+        
+        // SPA Fallback
         app.get('*', (req, res) => {
           res.sendFile(path.join(__dirname, 'dist', 'index.html'));
         });
@@ -39,7 +56,6 @@ jobs:
         app.listen(PORT, () => console.log(`Server on ${PORT}`));
         EOF
         
-        # Package.json im Root
         cat > package.json << 'EOF'
         {
           "name": "tsvrot-trainer",
