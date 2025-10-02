@@ -52,4 +52,4 @@ jobs:
           app-name: 'tsvrot-trainer-2025'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_2A44150CE0EE4A6AB64326970DFA28EF }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_EDDEDB9971494E4098721B38059D7D58 }}
