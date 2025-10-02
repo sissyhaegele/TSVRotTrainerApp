@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
+
 const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [expandedCourses, setExpandedCourses] = useState(new Set());
   const [selectedDay, setSelectedDay] = useState('Alle');
@@ -73,7 +75,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // 4. Stunden speichern (nutzt calculateHours - jetzt korrekt)
   const saveWeekHours = async () => {
     courses.forEach(course => {
-      // SKIP ausgefallene Kurse
       if (isCourseCancel(course.id)) {
         return;
       }
@@ -83,7 +84,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         const hours = calculateHours(course.startTime, course.endTime);
         
         weeklyTrainerIds.forEach(async trainerId => {
-          await fetch('https://tsvrot-api-v2.azurewebsites.net/api/training-sessions', {
+          await fetch(`${API_URL}/api/training-sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
