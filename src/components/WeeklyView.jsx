@@ -70,6 +70,10 @@ useEffect(() => {
   loadCancelledCourses();
 }, [currentWeek]);
 
+  const isHolidayWeek = () => {
+  return holidayWeeks.has(`${weekNumber}-${year}`);
+};
+
   // ===== WICHTIG: Funktionen in korrekter Reihenfolge =====
 
 
@@ -207,6 +211,21 @@ useEffect(() => {
     console.error('Fehler beim Speichern:', error);
     alert('Fehler beim Speichern der Änderung');
   }
+};
+
+// Nach der toggleCourseCancellation Funktion hinzufügen:
+const toggleHolidayWeek = () => {
+  const key = `${weekNumber}-${year}`;
+  const newHolidays = new Set(holidayWeeks);
+  
+  if (newHolidays.has(key)) {
+    newHolidays.delete(key);
+  } else {
+    newHolidays.add(key);
+  }
+  
+  setHolidayWeeks(newHolidays);
+  localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
 };
 
   // 8. Filter und Sortierung

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8181/api'
+  : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
 
 const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [expandedCourses, setExpandedCourses] = useState(new Set());
@@ -25,16 +27,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // Speichern bei Änderungen
-  useEffect(() => {
-    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
-  }, [weeklyAssignments]);
-
-  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-
-  // ===== WICHTIG: Funktionen in korrekter Reihenfolge =====
-  
-  // 1. KW berechnen - ZUERST definieren
+  // KW berechnen - ZUERST definieren
   const getWeekNumber = (date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const dayNum = d.getUTCDay() || 7;
@@ -46,7 +39,34 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const weekNumber = getWeekNumber(currentWeek);
   const year = currentWeek.getFullYear();
 
-  // 2. Hilfsfunktionen - VOR den Funktionen die sie nutzen
+  // Speichern bei Änderungen
+  useEffect(() => {
+    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
+  }, [weeklyAssignments]);
+
+  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+  // Cancelled Courses vom Server laden
+  useEffect(() => {
+    const loadCancelledCourses = async () => {
+      try {
+        const response = await fetch(`${API_URL}/cancelled-courses`);
+        if (response.ok) {
+          const data = await response.json();
+          const cancelled = new Set(data.map(item => 
+            `${item.course_id}-${item.week_number}-${item.year}`
+          ));
+          setCancelledCourses(cancelled);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Ausfälle:', error);
+      }
+    };
+    
+    loadCancelledCourses();
+  }, [currentWeek]);
+
+  // Hilfsfunktionen
   const calculateHours = (start, end) => {
     if (!start || !end) return 1;
     const [startH, startM] = start.split(':').map(Number);
@@ -54,7 +74,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return (endH + endM/60) - (startH + startM/60);
   };
 
-  // 3. Wochenspezifische Keys und Getter/Setter
+  // Wochenspezifische Keys und Getter/Setter
   const getWeeklyKey = (courseId) => {
     return `${courseId}-${weekNumber}-${year}`;
   };
@@ -72,7 +92,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }));
   };
 
-  // 4. Stunden speichern (nutzt calculateHours - jetzt korrekt)
+  // Stunden speichern
   const saveWeekHours = async () => {
     courses.forEach(course => {
       if (isCourseCancel(course.id)) {
@@ -84,7 +104,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         const hours = calculateHours(course.startTime, course.endTime);
         
         weeklyTrainerIds.forEach(async trainerId => {
-          await fetch(`${API_URL}/api/training-sessions`, {
+          await fetch(`${API_URL}/training-sessions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -101,7 +121,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
-  // 5. Woche wechseln
+  // Woche wechseln
   const changeWeek = (direction) => {
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() + (direction * 7));
@@ -111,7 +131,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     saveWeekHours();
   };
 
-  // 6. Datum-Funktionen
+  // Datum-Funktionen
   const getDateForCourse = (dayOfWeek) => {
     const date = new Date(currentWeek);
     const currentDay = date.getDay() || 7;
@@ -135,25 +155,51 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return `${day}.${month}.`;
   };
 
-  // 7. Ausfall-Funktionen
+  // Ausfall-Funktionen
   const isCourseCancel = (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
     const isHoliday = holidayWeeks.has(`${weekNumber}-${year}`);
     return cancelledCourses.has(key) || isHoliday;
   };
 
-  const toggleCourseCancellation = (courseId, reason = 'Sonstiges') => {
+  const toggleCourseCancellation = async (courseId, reason = 'Sonstiges') => {
     const key = `${courseId}-${weekNumber}-${year}`;
-    const newCancelled = new Set(cancelledCourses);
     
-    if (newCancelled.has(key)) {
-      newCancelled.delete(key);
-    } else {
-      newCancelled.add(key);
+    try {
+      if (cancelledCourses.has(key)) {
+        // Kurs reaktivieren - DELETE Request
+        const response = await fetch(`${API_URL}/cancelled-courses?course_id=${courseId}&week_number=${weekNumber}&year=${year}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          const newCancelled = new Set(cancelledCourses);
+          newCancelled.delete(key);
+          setCancelledCourses(newCancelled);
+        }
+      } else {
+        // Kurs ausfallen lassen - POST Request  
+        const response = await fetch(`${API_URL}/cancelled-courses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            course_id: courseId,
+            week_number: weekNumber,
+            year: year,
+            reason: reason
+          })
+        });
+        
+        if (response.ok) {
+          const newCancelled = new Set(cancelledCourses);
+          newCancelled.add(key);
+          setCancelledCourses(newCancelled);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      alert('Fehler beim Speichern der Änderung');
     }
-    
-    setCancelledCourses(newCancelled);
-    localStorage.setItem('tsvrot-cancelled-courses', JSON.stringify([...newCancelled]));
   };
 
   const toggleHolidayWeek = () => {
@@ -174,7 +220,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
   };
 
-  // 8. Filter und Sortierung
+  // Filter und Sortierung
   const filteredCourses = React.useMemo(() => {
     let filtered = [...courses];
     
@@ -192,7 +238,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return filtered;
   }, [courses, selectedDay]);
 
-  // 9. UI-Funktionen
+  // UI-Funktionen
   const toggleCourseExpansion = (courseId) => {
     const newExpanded = new Set(expandedCourses);
     if (newExpanded.has(courseId)) {
@@ -260,7 +306,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {isHolidayWeek() ? '🖐️ Ferien aktiv' : '🖐️ Als Ferien markieren'}
+            {isHolidayWeek() ? '🏖️ Ferien aktiv' : '🏖️ Als Ferien markieren'}
           </button>
         </div>
         
@@ -531,7 +577,3 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 };
 
 export default WeeklyView;
-
-
-
-
