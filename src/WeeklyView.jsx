@@ -66,6 +66,27 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     loadCancelledCourses();
   }, [currentWeek]);
 
+  // Holiday Weeks vom Server laden
+useEffect(() => {
+  const loadHolidayWeeks = async () => {
+    try {
+      const response = await fetch(`${API_URL}/holiday-weeks`);
+      if (response.ok) {
+        const data = await response.json();
+        const holidays = new Set(data.map(item => 
+          `${item.week_number}-${item.year}`
+        ));
+        setHolidayWeeks(holidays);
+        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...holidays]));
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Ferienwochen:', error);
+    }
+  };
+  
+  loadHolidayWeeks();
+}, []); // Nur einmal beim Start laden
+
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
     if (!start || !end) return 1;
@@ -202,23 +223,45 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   };
 
-  const toggleHolidayWeek = () => {
-    const key = `${weekNumber}-${year}`;
-    const newHolidays = new Set(holidayWeeks);
-    
-    if (newHolidays.has(key)) {
-      newHolidays.delete(key);
+  const toggleHolidayWeek = async () => {
+  const key = `${weekNumber}-${year}`;
+  
+  try {
+    if (holidayWeeks.has(key)) {
+      // Ferienwoche entfernen - DELETE Request
+      const response = await fetch(`${API_URL}/holiday-weeks?week_number=${weekNumber}&year=${year}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        const newHolidays = new Set(holidayWeeks);
+        newHolidays.delete(key);
+        setHolidayWeeks(newHolidays);
+        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
+      }
     } else {
-      newHolidays.add(key);
+      // Ferienwoche hinzufügen - POST Request
+      const response = await fetch(`${API_URL}/holiday-weeks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          week_number: weekNumber,
+          year: year
+        })
+      });
+      
+      if (response.ok) {
+        const newHolidays = new Set(holidayWeeks);
+        newHolidays.add(key);
+        setHolidayWeeks(newHolidays);
+        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
+      }
     }
-    
-    setHolidayWeeks(newHolidays);
-    localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
-  };
-
-  const isHolidayWeek = () => {
-    return holidayWeeks.has(`${weekNumber}-${year}`);
-  };
+  } catch (error) {
+    console.error('Fehler beim Speichern der Ferienwoche:', error);
+    alert('Fehler beim Speichern der Ferienwoche');
+  }
+};
 
   // Filter und Sortierung
   const filteredCourses = React.useMemo(() => {
