@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
-const API_URL = 'http://localhost:8181/api';
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [expandedCourses, setExpandedCourses] = useState(new Set());
