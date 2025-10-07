@@ -27,16 +27,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // Speichern bei Änderungen
-  useEffect(() => {
-    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
-  }, [weeklyAssignments]);
-
-  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-
-  // ===== WICHTIG: Funktionen in korrekter Reihenfolge =====
-  
-  // 1. KW berechnen - ZUERST definieren
+// 1. KW berechnen - ZUERST definieren
   const getWeekNumber = (date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const dayNum = d.getUTCDay() || 7;
@@ -47,6 +38,40 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
   const weekNumber = getWeekNumber(currentWeek);
   const year = currentWeek.getFullYear();
+
+  // Speichern bei Änderungen
+  useEffect(() => {
+    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
+  }, [weeklyAssignments]);
+
+  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+// Cancelled Courses vom Server laden
+useEffect(() => {
+  const loadCancelledCourses = async () => {
+    // Kalenderwoche und Jahr berechnen
+    const weekNumber = getWeekNumber(currentWeek);
+    const year = currentWeek.getFullYear();
+    
+    try {
+      const response = await fetch(`${API_URL}/cancelled-courses`);
+      if (response.ok) {
+        const data = await response.json();
+        const cancelled = new Set(data.map(item => 
+          `${item.course_id}-${item.week_number}-${item.year}`
+        ));
+        setCancelledCourses(cancelled);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Ausfälle:', error);
+    }
+  };
+  
+  loadCancelledCourses();
+}, [currentWeek]);
+
+  // ===== WICHTIG: Funktionen in korrekter Reihenfolge =====
+
 
   // 2. Hilfsfunktionen - VOR den Funktionen die sie nutzen
   const calculateHours = (start, end) => {
@@ -144,37 +169,45 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return cancelledCourses.has(key) || isHoliday;
   };
 
-  const toggleCourseCancellation = (courseId, reason = 'Sonstiges') => {
-    const key = `${courseId}-${weekNumber}-${year}`;
-    const newCancelled = new Set(cancelledCourses);
-    
-    if (newCancelled.has(key)) {
-      newCancelled.delete(key);
+ const toggleCourseCancellation = async (courseId, reason = 'Sonstiges') => {
+  const key = `${courseId}-${weekNumber}-${year}`;
+  
+  try {
+    if (cancelledCourses.has(key)) {
+      // Kurs reaktivieren - DELETE Request
+      const response = await fetch(`${API_URL}/cancelled-courses?course_id=${courseId}&week_number=${weekNumber}&year=${year}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        const newCancelled = new Set(cancelledCourses);
+        newCancelled.delete(key);
+        setCancelledCourses(newCancelled);
+      }
     } else {
-      newCancelled.add(key);
+      // Kurs ausfallen lassen - POST Request  
+      const response = await fetch(`${API_URL}/cancelled-courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: courseId,
+          week_number: weekNumber,
+          year: year,
+          reason: reason
+        })
+      });
+      
+      if (response.ok) {
+        const newCancelled = new Set(cancelledCourses);
+        newCancelled.add(key);
+        setCancelledCourses(newCancelled);
+      }
     }
-    
-    setCancelledCourses(newCancelled);
-    localStorage.setItem('tsvrot-cancelled-courses', JSON.stringify([...newCancelled]));
-  };
-
-  const toggleHolidayWeek = () => {
-    const key = `${weekNumber}-${year}`;
-    const newHolidays = new Set(holidayWeeks);
-    
-    if (newHolidays.has(key)) {
-      newHolidays.delete(key);
-    } else {
-      newHolidays.add(key);
-    }
-    
-    setHolidayWeeks(newHolidays);
-    localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
-  };
-
-  const isHolidayWeek = () => {
-    return holidayWeeks.has(`${weekNumber}-${year}`);
-  };
+  } catch (error) {
+    console.error('Fehler beim Speichern:', error);
+    alert('Fehler beim Speichern der Änderung');
+  }
+};
 
   // 8. Filter und Sortierung
   const filteredCourses = React.useMemo(() => {
