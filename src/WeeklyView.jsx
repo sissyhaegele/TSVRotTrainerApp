@@ -96,7 +96,7 @@ useEffect(() => {
   };
   
   loadHolidayWeeks();
-}, []); // Nur einmal beim Start laden
+}, [currentWeek]); 
 
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
