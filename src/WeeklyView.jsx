@@ -101,7 +101,7 @@ useEffect(() => {
   };
   
   loadHolidayWeeks();
-}, [currentWeek]); 
+}, [weekNumber, year]);
 
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
