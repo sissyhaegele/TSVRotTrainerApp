@@ -34,29 +34,34 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
  // Weekly Assignments vom Server laden
 useEffect(() => {
   const loadWeeklyAssignments = async () => {
+    if (!courses || courses.length === 0) return;
+    
     try {
-      // Lade alle Assignments für die aktuelle Woche
-      const response = await fetch(`${API_URL}/weekly-assignments?week_number=${weekNumber}&year=${year}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Konvertiere zu unserem Format: {courseId-weekNumber-year: [trainerId1, trainerId2]}
-        const assignments = {};
-        data.forEach(item => {
-          const key = `${item.course_id}-${item.week_number}-${item.year}`;
-          if (!assignments[key]) {
-            assignments[key] = [];
+      const assignments = {};
+      
+      // Für jeden Kurs die Assignments laden
+      for (const course of courses) {
+        const response = await fetch(
+          `${API_URL}/weekly-assignments?courseId=${course.id}&weekNumber=${weekNumber}&year=${year}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.length > 0) {
+            const key = `${course.id}-${weekNumber}-${year}`;
+            assignments[key] = data.map(item => item.trainer_id);
           }
-          assignments[key].push(item.trainer_id);
-        });
-        setWeeklyAssignments(assignments);
+        }
       }
+      
+      setWeeklyAssignments(assignments);
     } catch (error) {
       console.error('Fehler beim Laden der Zuweisungen:', error);
     }
   };
   
   loadWeeklyAssignments();
-}, [currentWeek]); // Bei Wochenwechsel neu laden
+}, [weekNumber, year, courses.length]); // Dependencies angepasst
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
