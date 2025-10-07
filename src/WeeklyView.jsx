@@ -11,21 +11,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   
   // State für Ausfälle und Ferien
-  const [cancelledCourses, setCancelledCourses] = useState(() => {
-    const saved = localStorage.getItem('tsvrot-cancelled-courses');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
+  const [cancelledCourses, setCancelledCourses] = useState(new Set());
   
-  const [holidayWeeks, setHolidayWeeks] = useState(() => {
-    const saved = localStorage.getItem('tsvrot-holiday-weeks');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
+  const [holidayWeeks, setHolidayWeeks] = useState(new Set());
   
-  // Wochenspezifische Trainer-Zuweisungen
-  const [weeklyAssignments, setWeeklyAssignments] = useState(() => {
-    const saved = localStorage.getItem('tsvrot-weekly-assignments');
-    return saved ? JSON.parse(saved) : {};
-  });
+// Wochenspezifische Trainer-Zuweisungen
+  const [weeklyAssignments, setWeeklyAssignments] = useState({});
 
   // KW berechnen - ZUERST definieren
   const getWeekNumber = (date) => {
@@ -40,11 +31,32 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const year = currentWeek.getFullYear();
 
   // Speichern bei Änderungen
-  useEffect(() => {
-    localStorage.setItem('tsvrot-weekly-assignments', JSON.stringify(weeklyAssignments));
-  }, [weeklyAssignments]);
-
-  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+ // Weekly Assignments vom Server laden
+useEffect(() => {
+  const loadWeeklyAssignments = async () => {
+    try {
+      // Lade alle Assignments für die aktuelle Woche
+      const response = await fetch(`${API_URL}/weekly-assignments?week_number=${weekNumber}&year=${year}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Konvertiere zu unserem Format: {courseId-weekNumber-year: [trainerId1, trainerId2]}
+        const assignments = {};
+        data.forEach(item => {
+          const key = `${item.course_id}-${item.week_number}-${item.year}`;
+          if (!assignments[key]) {
+            assignments[key] = [];
+          }
+          assignments[key].push(item.trainer_id);
+        });
+        setWeeklyAssignments(assignments);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Zuweisungen:', error);
+    }
+  };
+  
+  loadWeeklyAssignments();
+}, [currentWeek]); // Bei Wochenwechsel neu laden
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
@@ -77,7 +89,6 @@ useEffect(() => {
           `${item.week_number}-${item.year}`
         ));
         setHolidayWeeks(holidays);
-        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...holidays]));
       }
     } catch (error) {
       console.error('Fehler beim Laden der Ferienwochen:', error);
@@ -100,47 +111,63 @@ useEffect(() => {
     return `${courseId}-${weekNumber}-${year}`;
   };
 
-  const getWeeklyTrainers = (course) => {
-    const key = getWeeklyKey(course.id);
-    return weeklyAssignments[key] || course.assignedTrainerIds || [];
-  };
+  const setWeeklyTrainers = async (courseId, trainerIds) => {
+  const key = getWeeklyKey(courseId);
   
-  const setWeeklyTrainers = (courseId, trainerIds) => {
-    const key = getWeeklyKey(courseId);
-    setWeeklyAssignments(prev => ({
-      ...prev,
-      [key]: trainerIds
-    }));
-  };
+  try {
+    // An Server senden
+    const response = await fetch(`${API_URL}/weekly-assignments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        course_id: courseId,
+        week_number: weekNumber,
+        year: year,
+        trainer_ids: trainerIds
+      })
+    });
+    
+    if (response.ok) {
+      // Lokal aktualisieren
+      setWeeklyAssignments(prev => ({
+        ...prev,
+        [key]: trainerIds
+      }));
+    }
+  } catch (error) {
+    console.error('Fehler beim Speichern der Zuweisung:', error);
+    alert('Fehler beim Speichern der Trainer-Zuweisung');
+  }
+};
 
   // Stunden speichern
   const saveWeekHours = async () => {
-    courses.forEach(course => {
-      if (isCourseCancel(course.id)) {
-        return;
-      }
+  courses.forEach(course => {
+    if (isCourseCancel(course.id)) {
+      return;
+    }
+    
+    const weeklyTrainerIds = getWeeklyTrainers(course);
+    if (weeklyTrainerIds.length > 0) {
+      const hours = calculateHours(course.startTime, course.endTime);
       
-      const weeklyTrainerIds = getWeeklyTrainers(course);
-      if (weeklyTrainerIds.length > 0) {
-        const hours = calculateHours(course.startTime, course.endTime);
-        
-        weeklyTrainerIds.forEach(async trainerId => {
-          await fetch(`${API_URL}/training-sessions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              week_number: weekNumber,
-              year: year,
-              course_id: course.id,
-              trainer_id: trainerId,
-              hours: hours || 1,
-              status: 'done'
-            })
-          });
+      weeklyTrainerIds.forEach(async trainerId => {
+        await fetch(`${API_URL}/training-sessions`, {  // OHNE /api davor!
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            week_number: weekNumber,
+            year: year,
+            course_id: course.id,
+            trainer_id: trainerId,
+            hours: hours || 1,
+            status: 'done'
+          })
         });
-      }
-    });
-  };
+      });
+    }
+  });
+};
 
   // Woche wechseln
   const changeWeek = (direction) => {
@@ -237,7 +264,6 @@ useEffect(() => {
         const newHolidays = new Set(holidayWeeks);
         newHolidays.delete(key);
         setHolidayWeeks(newHolidays);
-        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
       }
     } else {
       // Ferienwoche hinzufügen - POST Request
@@ -254,7 +280,6 @@ useEffect(() => {
         const newHolidays = new Set(holidayWeeks);
         newHolidays.add(key);
         setHolidayWeeks(newHolidays);
-        localStorage.setItem('tsvrot-holiday-weeks', JSON.stringify([...newHolidays]));
       }
     }
   } catch (error) {
