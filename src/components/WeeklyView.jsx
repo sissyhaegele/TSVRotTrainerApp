@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8181/api'
+  : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
 
 const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [expandedCourses, setExpandedCourses] = useState(new Set());

@@ -1,4 +1,6 @@
-﻿const API_URL = 'https://tsvrot-api-v2.azurewebsites.net/api';
+﻿const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8181/api'
+  : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
 
 export const api = {
   async getTrainers() {
