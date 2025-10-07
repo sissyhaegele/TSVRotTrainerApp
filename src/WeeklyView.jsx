@@ -157,7 +157,7 @@ useEffect(() => {
       const hours = calculateHours(course.startTime, course.endTime);
       
       weeklyTrainerIds.forEach(async trainerId => {
-        await fetch(`${API_URL}/training-sessions`, {  // OHNE /api davor!
+        await fetch(`${API_URL}/training-sessions`, {   // OHNE /api davor!
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -257,6 +257,7 @@ useEffect(() => {
 
   const toggleHolidayWeek = async () => {
   const key = `${weekNumber}-${year}`;
+    console.log('Toggle Holiday Week:', key, 'Has:', holidayWeeks.has(key));
   
   try {
     if (holidayWeeks.has(key)) {
