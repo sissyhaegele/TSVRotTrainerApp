@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
+import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
@@ -49,6 +49,23 @@ const getWeeklyTrainers = (course) => {
   
   return weekly;
 };
+
+  // ✅ NEU: Sortiere Trainer nach Verfügbarkeit und Nachname
+  const getSortedTrainers = (dayOfWeek) => {
+    return [...trainers].sort((a, b) => {
+      const aAvailable = a.availability?.includes(dayOfWeek) || false;
+      const bAvailable = b.availability?.includes(dayOfWeek) || false;
+      
+      // 1. Verfügbare Trainer zuerst
+      if (aAvailable && !bAvailable) return -1;
+      if (!aAvailable && bAvailable) return 1;
+      
+      // 2. Alphabetisch nach Nachname
+      const aLastName = (a.lastName || a.last_name || '').toLowerCase();
+      const bLastName = (b.lastName || b.last_name || '').toLowerCase();
+      return aLastName.localeCompare(bLastName);
+    });
+  };
 
   // Funktion um zu prüfen ob es eine Ferienwoche ist
   const isHolidayWeek = () => {
@@ -402,8 +419,10 @@ const getTrainerName = (trainerId) => {
   return `${firstName} ${lastName}`;
 };
 
-  // ANGEPASST für Batch-Updates - keine einzelnen API-Calls mehr
-  const toggleTrainerAssignment = (courseId, trainerId) => {
+  // ✅ NEU: Dropdown-basierte Trainer-Zuweisung
+  const addTrainerToCourse = (courseId, trainerId) => {
+    if (!trainerId) return;
+    
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
     
@@ -413,23 +432,35 @@ const getTrainerName = (trainerId) => {
     
     setWeeklyAssignments(prev => {
       const currentAssignments = prev[key] || [];
-      const newAssignments = currentAssignments.includes(trainerId)
-        ? currentAssignments.filter(id => id !== trainerId)
-        : [...currentAssignments, trainerId];
+      
+      // Prüfe ob bereits zugewiesen
+      if (currentAssignments.includes(parseInt(trainerId))) {
+        return prev;
+      }
       
       return {
         ...prev,
-        [key]: newAssignments
+        [key]: [...currentAssignments, parseInt(trainerId)]
       };
     });
-    // Auto-Save wird automatisch durch useEffect getriggert
   };
 
-  const getAvailableTrainers = (course) => {
-    const weeklyTrainerIds = getWeeklyTrainers(course);
-    return trainers.filter(trainer => 
-      !weeklyTrainerIds.includes(trainer.id)
-    );
+  // ✅ Trainer entfernen
+  const removeTrainerFromCourse = (courseId, trainerId) => {
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+    
+    const weekNum = getWeekNumber(selectedWeek);
+    const year = selectedWeek.getFullYear();
+    const key = `${courseId}-${weekNum}-${year}`;
+    
+    setWeeklyAssignments(prev => {
+      const currentAssignments = prev[key] || [];
+      return {
+        ...prev,
+        [key]: currentAssignments.filter(id => id !== trainerId)
+      };
+    });
   };
 
   const getStaffingStatus = (course) => {
@@ -441,89 +472,6 @@ const getTrainerName = (trainerId) => {
     if (assigned < required) return { status: 'warning', color: 'yellow', message: `${required - assigned} fehlt` };
     if (assigned === required) return { status: 'optimal', color: 'green', message: '' };
     return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
-  };
-
-  // NEU: Manuelle Save-Funktion (optional, falls Sie einen Save-Button wollen)
-  const saveAllChanges = async () => {
-    const weekNum = getWeekNumber(selectedWeek);
-    const year = selectedWeek.getFullYear();
-    
-    // Sammle alle Änderungen für diese Woche
-    const updates = {};
-    courses.forEach(course => {
-      const key = `${course.id}-${weekNum}-${year}`;
-      if (weeklyAssignments[key]) {
-        updates[course.id] = weeklyAssignments[key];
-      }
-    });
-    
-    if (Object.keys(updates).length === 0) {
-      console.log('Keine Änderungen zum Speichern');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/weekly-assignments/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates, weekNumber: weekNum, year })
-      });
-      
-      if (response.ok) {
-        console.log('Alle Änderungen erfolgreich gespeichert');
-        // Optional: Zeige Erfolgs-Toast/Notification
-      }
-    } catch (error) {
-      console.error('Fehler beim Speichern:', error);
-      // Optional: Zeige Fehler-Toast/Notification
-    }
-  };
-
-  // NEU: Hilfsfunktion zum Laden aller Daten (für Refresh/Konfliktauflösung)
-  const refreshAllData = async () => {
-    const weekNum = getWeekNumber(selectedWeek);
-    const year = selectedWeek.getFullYear();
-    
-    try {
-      // Lade Weekly Assignments
-      const assignmentsResponse = await fetch(
-        `${API_URL}/weekly-assignments/batch?weekNumber=${weekNum}&year=${year}`
-      );
-      
-      if (assignmentsResponse.ok) {
-        const allAssignments = await assignmentsResponse.json();
-        const formattedAssignments = {};
-        Object.entries(allAssignments).forEach(([courseId, trainers]) => {
-          formattedAssignments[`${courseId}-${weekNum}-${year}`] = 
-            trainers.map(t => t.trainerId);
-        });
-        setWeeklyAssignments(formattedAssignments);
-      }
-      
-      // Lade Cancelled Courses
-      const cancelledResponse = await fetch(`${API_URL}/cancelled-courses`);
-      if (cancelledResponse.ok) {
-        const data = await cancelledResponse.json();
-        const cancelled = new Set(data.map(item => 
-          `${item.course_id}-${item.week_number}-${item.year}`
-        ));
-        setCancelledCourses(cancelled);
-      }
-      
-      // Lade Holiday Weeks
-      const holidayResponse = await fetch(`${API_URL}/holiday-weeks`);
-      if (holidayResponse.ok) {
-        const data = await holidayResponse.json();
-        const holidays = new Set(data.map(item => 
-          `${item.week_number}-${item.year}`
-        ));
-        setHolidayWeeks(holidays);
-      }
-      
-      console.log('Alle Daten erfolgreich aktualisiert');
-    } catch (error) {
-      console.error('Fehler beim Aktualisieren der Daten:', error);
-    }
   };
 
   // ===== RENDER =====
@@ -685,68 +633,75 @@ const getTrainerName = (trainerId) => {
                   </div>
                 </div>
 
-                {/* Expanded Section */}
+                {/* Expanded Section - ✅ NEU mit Dropdown */}
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="sm:ml-9">
-                      <h4 className="font-medium mb-3 text-sm sm:text-base">Verfügbare Trainer:</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {getAvailableTrainers(course).map(trainer => {
-                          const isAvailable = trainer.availability?.includes(course.dayOfWeek);
-                          return (
-                            <button
-                              key={trainer.id}
-                              onClick={() => toggleTrainerAssignment(course.id, trainer.id)}
-                              className={`text-left p-3 rounded-lg border-2 hover:bg-blue-50 touch-manipulation ${
-                                isAvailable ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300'
-                              }`}
-                            >
-                              <div className="font-medium text-sm">
-                                {trainer.firstName} {trainer.lastName}
-                              </div>
-                              <div className="text-xs text-gray-600 mt-1">
-                                {trainer.qualifications?.slice(0, 2).join(', ') || 'Keine Qualifikationen'}
-                              </div>
-                              {isAvailable ? (
-                                <span className="text-xs text-green-600 mt-1 block">
-                                  Verfügbar am {course.dayOfWeek}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-orange-600 mt-1 block">
-                                  Normalerweise nicht {course.dayOfWeek}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                        {getAvailableTrainers(course).length === 0 && (
-                          <p className="text-sm text-gray-500 italic col-span-full">
-                            Alle Trainer sind bereits zugewiesen
-                          </p>
-                        )}
-                      </div>
+                      <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer zuweisen:</h4>
                       
-                      {/* Zugewiesene Trainer entfernen */}
+                      {/* Zugewiesene Trainer anzeigen */}
                       {(() => {
                         const weeklyTrainerIds = getWeeklyTrainers(course);
+                        const courseDayOfWeek = course.dayOfWeek || course.day_of_week;
+                        
                         return weeklyTrainerIds.length > 0 && (
-                          <div className="mt-4">
-                            <h4 className="font-medium mb-2 text-sm sm:text-base">Trainer entfernen:</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {weeklyTrainerIds.map(trainerId => (
-                                <button
-                                  key={trainerId}
-                                  onClick={() => toggleTrainerAssignment(course.id, trainerId)}
-                                  className="inline-flex items-center px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm hover:bg-red-100 touch-manipulation"
-                                >
-                                  <UserX className="w-4 h-4 mr-1 text-red-600" />
-                                  {getTrainerName(trainerId)}
-                                </button>
-                              ))}
-                            </div>
+                          <div className="mb-3 space-y-1">
+                            {weeklyTrainerIds.map(trainerId => {
+                              const trainer = trainers.find(t => t.id === trainerId);
+                              if (!trainer) return null;
+                              
+                              const isAvailable = trainer.availability?.includes(courseDayOfWeek);
+                              
+                              return (
+                                <div key={trainerId} className="flex items-center justify-between bg-green-50 border border-green-200 rounded px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <UserCheck className="w-4 h-4 text-green-600" />
+                                    <span className="font-medium text-sm">{getTrainerName(trainerId)}</span>
+                                    {isAvailable && (
+                                      <span className="text-xs text-green-600">✓ Verfügbar</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => removeTrainerFromCourse(course.id, trainerId)}
+                                    className="text-red-500 hover:text-red-700"
+                                    title="Entfernen"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })()}
+                      
+                      {/* Dropdown zum Hinzufügen */}
+                      <select
+                        className="w-full px-3 py-2 border rounded-lg bg-white"
+                        value=""
+                        onChange={(e) => addTrainerToCourse(course.id, e.target.value)}
+                      >
+                        <option value="">Trainer hinzufügen...</option>
+                        {getSortedTrainers(course.dayOfWeek || course.day_of_week).map(trainer => {
+                          const weeklyTrainerIds = getWeeklyTrainers(course);
+                          const isAssigned = weeklyTrainerIds.includes(trainer.id);
+                          const isAvailable = trainer.availability?.includes(course.dayOfWeek || course.day_of_week);
+                          
+                          if (isAssigned) return null; // Bereits zugewiesene Trainer ausblenden
+                          
+                          const firstName = trainer.firstName || trainer.first_name || '';
+                          const lastName = trainer.lastName || trainer.last_name || '';
+                          
+                          return (
+                            <option key={trainer.id} value={trainer.id}>
+                              {firstName} {lastName} {isAvailable ? '✓' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week} · Sortiert nach Verfügbarkeit
+                      </p>
                       
                       {/* Kurs ausfallen lassen / reaktivieren */}
                       <div className="mt-4 pt-4 border-t">
@@ -760,7 +715,7 @@ const getTrainerName = (trainerId) => {
                         >
                           {isCourseCancel(course.id) ? (
                             <>
-                              <span>✓</span>
+                              <span>✔</span>
                               <span>Kurs reaktivieren</span>
                             </>
                           ) : (
