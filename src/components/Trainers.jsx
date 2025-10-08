@@ -5,6 +5,7 @@ import {
   Phone, 
   Plus, 
   Trash2, 
+  UserX,
   Edit, 
   Save, 
   X,
@@ -159,7 +160,10 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
   };
 
   const deleteTrainer = async (id) => {
-    if (!window.confirm('Trainer wirklich löschen?')) return;
+    // ✅ Verschärfte Warnung mit doppelter Bestätigung
+    if (!window.confirm('⚠️ WARNUNG: Trainer WIRKLICH LÖSCHEN?\n\nAlle Daten (inkl. Stunden) gehen UNWIEDERBRINGLICH verloren!\n\nNUR für Test-/Falschdaten verwenden!\n\nFür reguläre Trainer nutzen Sie "Deaktivieren".')) return;
+    
+    if (!window.confirm('LETZTE WARNUNG: Wirklich löschen? Diese Aktion kann NICHT rückgängig gemacht werden!')) return;
     
     try {
       setLoading(true);
@@ -174,6 +178,42 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     } catch (err) {
       console.error('Error deleting trainer:', err);
       setError('Trainer konnte nicht gelöscht werden');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ NEU: Trainer aktivieren/deaktivieren
+  const toggleTrainerActive = async (trainer) => {
+    const newActiveState = !trainer.isActive;
+    const action = newActiveState ? 'aktivieren' : 'deaktivieren';
+    
+    if (!window.confirm(`Trainer ${action}? ${newActiveState ? 'Trainer wird wieder in Auswahlen angezeigt.' : 'Kann später wieder aktiviert werden.'}`)) return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/trainers/${trainer.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: trainer.firstName || trainer.first_name,
+          lastName: trainer.lastName || trainer.last_name,
+          email: trainer.email || null,
+          phone: trainer.phone || null,
+          availability: trainer.availability || [],
+          qualifications: trainer.qualifications || [],
+          isActive: newActiveState
+        })
+      });
+      
+      if (!response.ok) throw new Error('Fehler beim Ändern des Status');
+      
+      // Trainer aus Liste entfernen (wird durch Backend-Filter ausgeblendet)
+      setTrainers(trainers.filter(t => t.id !== trainer.id));
+      setError(null);
+    } catch (err) {
+      console.error('Error toggling trainer status:', err);
+      setError('Status konnte nicht geändert werden');
     } finally {
       setLoading(false);
     }
@@ -443,8 +483,13 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
               <>
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
                       {getTrainerName(trainer)}
+                      {trainer.isActive === false && (
+                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                          Inaktiv
+                        </span>
+                      )}
                     </h3>
                     <div className="space-y-1 mt-2">
                       {trainer.email && (
@@ -468,18 +513,26 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                         onClick={() => startEdit(trainer)}
                         disabled={loading}
                         className="text-blue-500 hover:text-blue-700 disabled:opacity-50"
+                        title="Bearbeiten"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      {deleteMode && (
-                        <button
-                          onClick={() => deleteTrainer(trainer.id)}
-                          disabled={loading}
-                          className="text-red-500 hover:text-red-700 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => toggleTrainerActive(trainer)}
+                        disabled={loading}
+                        className="text-orange-500 hover:text-orange-700 disabled:opacity-50"
+                        title="Deaktivieren (empfohlen)"
+                      >
+                        <UserX className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteTrainer(trainer.id)}
+                        disabled={loading}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        title="Endgültig löschen (nur für Testdaten!)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                 </div>
