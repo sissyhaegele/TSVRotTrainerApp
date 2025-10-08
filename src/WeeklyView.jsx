@@ -30,58 +30,119 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const weekNumber = getWeekNumber(currentWeek);
   const year = currentWeek.getFullYear();
 
-  // Speichern bei Änderungen
- // Weekly Assignments vom Server laden
+  // selectedWeek ist dasselbe wie currentWeek
+  const selectedWeek = currentWeek;
+
+  // Wochentage Array
+  const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+  // Funktion um Trainer für eine bestimmte Woche zu bekommen
+  const getWeeklyTrainers = (course) => {
+    const key = `${course.id}-${weekNumber}-${year}`;
+    return weeklyAssignments[key] || [];
+  };
+
+  // Funktion um zu prüfen ob es eine Ferienwoche ist
+  const isHolidayWeek = () => {
+    return holidayWeeks.has(`${weekNumber}-${year}`);
+  };
+
+ // Weekly Assignments vom Server laden - OPTIMIERT mit Batch-Loading
 useEffect(() => {
   const loadWeeklyAssignments = async () => {
-    if (!courses || courses.length === 0) return;
+      const weekNum = getWeekNumber(currentWeek);
+      const year = currentWeek.getFullYear();
     
     try {
-      const assignments = {};
+      // Ein Request für alle Assignments der Woche
+      const response = await fetch(
+        `${API_URL}/weekly-assignments/batch?weekNumber=${weekNum}&year=${year}`
+      );
       
-      // Für jeden Kurs die Assignments laden
-      for (const course of courses) {
-        const response = await fetch(
-          `${API_URL}/weekly-assignments?courseId=${course.id}&weekNumber=${weekNumber}&year=${year}`
-        );
+      if (response.ok) {
+        const allAssignments = await response.json();
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.length > 0) {
-            const key = `${course.id}-${weekNumber}-${year}`;
-            assignments[key] = data.map(item => item.trainer_id);
-          }
-        }
+        // Konvertiere zu dem erwarteten Format
+        const formattedAssignments = {};
+        Object.entries(allAssignments).forEach(([courseId, trainers]) => {
+          formattedAssignments[`${courseId}-${weekNum}-${year}`] = 
+            trainers.map(t => t.trainerId);
+        });
+        
+        setWeeklyAssignments(formattedAssignments);
       }
-      
-      setWeeklyAssignments(assignments);
     } catch (error) {
-      console.error('Fehler beim Laden der Zuweisungen:', error);
+      console.error('Error loading weekly assignments:', error);
     }
   };
   
-  loadWeeklyAssignments();
-}, [weekNumber, year, courses.length]); // Dependencies angepasst
+  if (courses.length > 0) {
+    loadWeeklyAssignments();
+  }
+}, [selectedWeek, courses.length]); // Dependencies korrigiert
 
-  // Cancelled Courses vom Server laden
-  useEffect(() => {
-    const loadCancelledCourses = async () => {
-      try {
-        const response = await fetch(`${API_URL}/cancelled-courses`);
-        if (response.ok) {
-          const data = await response.json();
-          const cancelled = new Set(data.map(item => 
-            `${item.course_id}-${item.week_number}-${item.year}`
-          ));
-          setCancelledCourses(cancelled);
-        }
-      } catch (error) {
-        console.error('Fehler beim Laden der Ausfälle:', error);
-      }
-    };
+// Auto-Save für Weekly Assignments bei Änderungen
+useEffect(() => {
+  const saveAllWeeklyAssignments = async () => {
+    const weekNum = getWeekNumber(currentWeek);
+    const year = currentWeek.getFullYear();
     
-    loadCancelledCourses();
-  }, [currentWeek]);
+    // Sammle alle Änderungen für diese Woche
+    const updates = {};
+    courses.forEach(course => {
+      const key = `${course.id}-${weekNum}-${year}`;
+      if (weeklyAssignments[key]) {
+        updates[course.id] = weeklyAssignments[key];
+      }
+    });
+    
+    // Nur speichern wenn es Updates gibt
+    if (Object.keys(updates).length === 0) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/weekly-assignments/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates, weekNumber: weekNum, year })
+      });
+      
+      if (response.ok) {
+        console.log('Batch save successful');
+      }
+    } catch (error) {
+      console.error('Error saving batch assignments:', error);
+    }
+  };
+  
+  // Debounced Auto-Save - wartet 2 Sekunden nach der letzten Änderung
+  const timeoutId = setTimeout(() => {
+    if (Object.keys(weeklyAssignments).length > 0) {
+      saveAllWeeklyAssignments();
+    }
+  }, 2000);
+  
+  return () => clearTimeout(timeoutId);
+}, [weeklyAssignments, courses, selectedWeek]);
+
+// Cancelled Courses vom Server laden
+useEffect(() => {
+  const loadCancelledCourses = async () => {
+    try {
+      const response = await fetch(`${API_URL}/cancelled-courses`);
+      if (response.ok) {
+        const data = await response.json();
+        const cancelled = new Set(data.map(item => 
+          `${item.course_id}-${item.week_number}-${item.year}`
+        ));
+        setCancelledCourses(cancelled);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Ausfälle:', error);
+    }
+  };
+  
+  loadCancelledCourses();
+}, [currentWeek]);
 
   // Holiday Weeks vom Server laden
 useEffect(() => {
@@ -313,7 +374,7 @@ useEffect(() => {
   }, [courses, selectedDay]);
 
   // UI-Funktionen
-  const toggleCourseExpansion = (courseId) => {
+const toggleCourseExpansion = (courseId) => {
     const newExpanded = new Set(expandedCourses);
     if (newExpanded.has(courseId)) {
       newExpanded.delete(courseId);
@@ -323,21 +384,36 @@ useEffect(() => {
     setExpandedCourses(newExpanded);
   };
 
-  const getTrainerName = (trainerId) => {
-    const trainer = trainers.find(t => t.id === trainerId);
-    return trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unbekannter Trainer';
-  };
+const getTrainerName = (trainerId) => {
+  const trainer = trainers.find(t => t.id === trainerId);
+  if (!trainer) return 'Unbekannter Trainer';
+  // Handle beide Varianten
+  const firstName = trainer.firstName || trainer.first_name || '';
+  const lastName = trainer.lastName || trainer.last_name || '';
+  return `${firstName} ${lastName}`;
+};
 
+  // ANGEPASST für Batch-Updates - keine einzelnen API-Calls mehr
   const toggleTrainerAssignment = (courseId, trainerId) => {
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
     
-    const currentIds = getWeeklyTrainers(course);
-    const newIds = currentIds.includes(trainerId)
-      ? currentIds.filter(id => id !== trainerId)
-      : [...currentIds, trainerId];
+    const weekNum = getWeekNumber(selectedWeek);
+    const year = selectedWeek.getFullYear();
+    const key = `${courseId}-${weekNum}-${year}`;
     
-    setWeeklyTrainers(courseId, newIds);
+    setWeeklyAssignments(prev => {
+      const currentAssignments = prev[key] || [];
+      const newAssignments = currentAssignments.includes(trainerId)
+        ? currentAssignments.filter(id => id !== trainerId)
+        : [...currentAssignments, trainerId];
+      
+      return {
+        ...prev,
+        [key]: newAssignments
+      };
+    });
+    // Auto-Save wird automatisch durch useEffect getriggert
   };
 
   const getAvailableTrainers = (course) => {
@@ -356,6 +432,89 @@ useEffect(() => {
     if (assigned < required) return { status: 'warning', color: 'yellow', message: `${required - assigned} fehlt` };
     if (assigned === required) return { status: 'optimal', color: 'green', message: '' };
     return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
+  };
+
+  // NEU: Manuelle Save-Funktion (optional, falls Sie einen Save-Button wollen)
+  const saveAllChanges = async () => {
+    const weekNum = getWeekNumber(selectedWeek);
+    const year = selectedWeek.getFullYear();
+    
+    // Sammle alle Änderungen für diese Woche
+    const updates = {};
+    courses.forEach(course => {
+      const key = `${course.id}-${weekNum}-${year}`;
+      if (weeklyAssignments[key]) {
+        updates[course.id] = weeklyAssignments[key];
+      }
+    });
+    
+    if (Object.keys(updates).length === 0) {
+      console.log('Keine Änderungen zum Speichern');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/weekly-assignments/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates, weekNumber: weekNum, year })
+      });
+      
+      if (response.ok) {
+        console.log('Alle Änderungen erfolgreich gespeichert');
+        // Optional: Zeige Erfolgs-Toast/Notification
+      }
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      // Optional: Zeige Fehler-Toast/Notification
+    }
+  };
+
+  // NEU: Hilfsfunktion zum Laden aller Daten (für Refresh/Konfliktauflösung)
+  const refreshAllData = async () => {
+    const weekNum = getWeekNumber(selectedWeek);
+    const year = selectedWeek.getFullYear();
+    
+    try {
+      // Lade Weekly Assignments
+      const assignmentsResponse = await fetch(
+        `${API_URL}/weekly-assignments/batch?weekNumber=${weekNum}&year=${year}`
+      );
+      
+      if (assignmentsResponse.ok) {
+        const allAssignments = await assignmentsResponse.json();
+        const formattedAssignments = {};
+        Object.entries(allAssignments).forEach(([courseId, trainers]) => {
+          formattedAssignments[`${courseId}-${weekNum}-${year}`] = 
+            trainers.map(t => t.trainerId);
+        });
+        setWeeklyAssignments(formattedAssignments);
+      }
+      
+      // Lade Cancelled Courses
+      const cancelledResponse = await fetch(`${API_URL}/cancelled-courses`);
+      if (cancelledResponse.ok) {
+        const data = await cancelledResponse.json();
+        const cancelled = new Set(data.map(item => 
+          `${item.course_id}-${item.week_number}-${item.year}`
+        ));
+        setCancelledCourses(cancelled);
+      }
+      
+      // Lade Holiday Weeks
+      const holidayResponse = await fetch(`${API_URL}/holiday-weeks`);
+      if (holidayResponse.ok) {
+        const data = await holidayResponse.json();
+        const holidays = new Set(data.map(item => 
+          `${item.week_number}-${item.year}`
+        ));
+        setHolidayWeeks(holidays);
+      }
+      
+      console.log('Alle Daten erfolgreich aktualisiert');
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Daten:', error);
+    }
   };
 
   // ===== RENDER =====
