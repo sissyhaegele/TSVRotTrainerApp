@@ -22,7 +22,6 @@ const API_URL = window.location.hostname === 'localhost'
 
 export default function Trainers({ trainers, setTrainers, deleteMode, adminMode }) {
   const [editingTrainer, setEditingTrainer] = useState(null);
-  const [trainerHours, setTrainerHours] = useState({});
   const [newTrainer, setNewTrainer] = useState({
     firstName: '',
     lastName: '',
@@ -40,10 +39,12 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     loadTrainers();
   }, []);
 
-  // Berechne Trainer-Statistiken beim Laden und bei Änderungen
+ // ✅ Lade Stunden von Azure DB beim Start
   useEffect(() => {
-    calculateTrainerStats();
-  }, [trainers]);
+    if (trainers.length > 0) {
+      loadTrainerHours();
+    }
+  }, [trainers.length]);
 
   const loadTrainers = async () => {
     try {
@@ -61,53 +62,40 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     }
   };
 
-  const calculateTrainerStats = () => {
-    const sessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
-    const stats = {};
-    const currentYear = new Date().getFullYear();
-    
-    trainers.forEach(trainer => {
-      stats[trainer.id] = {
-        totalSessions: 0,
-        presentCount: 0,
-        hoursCompleted: 0,
-        hoursThisMonth: 0,
-        lastSession: null
-      };
-    });
-
-    sessions.forEach(session => {
-      const sessionDate = new Date(session.date);
-      const sessionYear = sessionDate.getFullYear();
-      const isCurrentMonth = sessionDate.getMonth() === new Date().getMonth() && 
-                            sessionYear === currentYear;
+  // ✅ NEU: Stunden von Azure DB laden statt localStorage
+  const loadTrainerHours = async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth() + 1;
       
-      if (session.attendance) {
-        session.attendance.forEach(att => {
-          if (stats[att.trainerId]) {
-            if (sessionYear === currentYear) {
-              stats[att.trainerId].totalSessions++;
-              
-              if (att.isPresent) {
-                stats[att.trainerId].presentCount++;
-                stats[att.trainerId].hoursCompleted++;
-                
-                if (isCurrentMonth) {
-                  stats[att.trainerId].hoursThisMonth++;
-                }
-                
-                if (!stats[att.trainerId].lastSession || 
-                    sessionDate > new Date(stats[att.trainerId].lastSession)) {
-                  stats[att.trainerId].lastSession = session.date;
-                }
-              }
+      // Jahresstunden laden
+      const yearResponse = await fetch(`${API_URL}/trainer-hours/${currentYear}`);
+      if (yearResponse.ok) {
+        const yearData = await yearResponse.json();
+        setTrainerStats(yearData);
+      }
+      
+      // Monatsstunden laden
+      const monthResponse = await fetch(`${API_URL}/trainer-hours/${currentYear}/${currentMonth}`);
+      if (monthResponse.ok) {
+        const monthData = await monthResponse.json();
+        // Merge mit Jahresstunden
+        setTrainerStats(prev => {
+          const merged = { ...prev };
+          Object.keys(monthData).forEach(trainerId => {
+            if (merged[trainerId]) {
+              merged[trainerId] = {
+                ...merged[trainerId],
+                ...monthData[trainerId]
+              };
             }
-          }
+          });
+          return merged;
         });
       }
-    });
-
-    setTrainerStats(stats);
+    } catch (err) {
+      console.error('Error loading trainer hours:', err);
+    }
   };
 
   const daysOfWeek = [
@@ -542,7 +530,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {trainerHours[trainer.id] || 0}
+                      {trainerStats[trainer.id]?.totalHours || 0}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />
@@ -551,7 +539,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-green-600">
-                        {trainerStats[trainer.id]?.presentCount || 0}
+                        {trainerStats[trainer.id]?.totalSessions || 0}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <CheckCircle className="w-3 h-3 mr-1" />
@@ -560,9 +548,9 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-gray-600">
-                        {trainerStats[trainer.id]?.totalSessions > 0 
-                          ? Math.round((trainerStats[trainer.id].presentCount / trainerStats[trainer.id].totalSessions) * 100)
-                          : 100}%
+                       {trainerStats[trainer.id]?.totalSessions > 0 
+                        ? Math.round((trainerStats[trainer.id].totalHours / trainerStats[trainer.id].totalSessions) * 100)
+                        : 100}%
                       </div>
                       <div className="text-xs text-gray-600">Quote</div>
                     </div>
@@ -571,7 +559,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>
                         <TrendingUp className="w-3 h-3 inline mr-1" />
-                        Diesen Monat: {trainerStats[trainer.id]?.hoursThisMonth || 0} Std.
+                        Diesen Monat: {trainerStats[trainer.id]?.monthlyHours || 0} Std.
                       </span>
                       <span>{new Date().getFullYear()}</span>
                     </div>
