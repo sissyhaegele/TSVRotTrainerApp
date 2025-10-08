@@ -11,7 +11,8 @@ import {
   Save, 
   X,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost' 
@@ -68,6 +69,23 @@ export default function Courses({
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ NEU: Sortiere Trainer nach Verfügbarkeit und Nachname
+  const getSortedTrainers = (dayOfWeek) => {
+    return [...trainers].sort((a, b) => {
+      const aAvailable = a.availability?.includes(dayOfWeek) || false;
+      const bAvailable = b.availability?.includes(dayOfWeek) || false;
+      
+      // 1. Verfügbare Trainer zuerst
+      if (aAvailable && !bAvailable) return -1;
+      if (!aAvailable && bAvailable) return 1;
+      
+      // 2. Alphabetisch nach Nachname
+      const aLastName = (a.lastName || a.last_name || '').toLowerCase();
+      const bLastName = (b.lastName || b.last_name || '').toLowerCase();
+      return aLastName.localeCompare(bLastName);
+    });
   };
 
   const addCourse = async () => {
@@ -180,14 +198,21 @@ export default function Courses({
     setEditingCourse(null);
   };
 
-  const toggleTrainerAssignment = async (courseId, trainerId) => {
+  // ✅ NEU: Dropdown-basierte Trainer-Zuweisung
+  const addTrainerToCourse = async (courseId, trainerId) => {
     const course = courses.find(c => c.id === courseId);
-    if (!course) return;
+    if (!course || !trainerId) return;
 
     const currentIds = course.assignedTrainerIds || [];
-    const newIds = currentIds.includes(trainerId)
-      ? currentIds.filter(id => id !== trainerId)
-      : [...currentIds, trainerId];
+    
+    // Prüfe ob Trainer bereits zugewiesen
+    if (currentIds.includes(parseInt(trainerId))) {
+      setError('Dieser Trainer ist bereits zugewiesen');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    const newIds = [...currentIds, parseInt(trainerId)];
 
     try {
       setLoading(true);
@@ -216,6 +241,46 @@ export default function Courses({
     } catch (err) {
       console.error('Error updating trainer assignment:', err);
       setError('Trainer-Zuweisung konnte nicht gespeichert werden');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Trainer entfernen
+  const removeTrainerFromCourse = async (courseId, trainerId) => {
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+
+    const currentIds = course.assignedTrainerIds || [];
+    const newIds = currentIds.filter(id => id !== trainerId);
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/courses/${courseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: course.name,
+          dayOfWeek: course.dayOfWeek || course.day_of_week,
+          startTime: course.startTime || course.start_time,
+          endTime: course.endTime || course.end_time || null,
+          location: course.location || null,
+          category: course.category || null,
+          requiredTrainers: course.requiredTrainers || course.required_trainers || 2,
+          assignedTrainerIds: newIds
+        })
+      });
+      
+      if (!response.ok) throw new Error('Fehler beim Speichern');
+      
+      const updatedCourse = await response.json();
+      setCourses(courses.map(c => 
+        c.id === updatedCourse.id ? updatedCourse : c
+      ));
+      setError(null);
+    } catch (err) {
+      console.error('Error removing trainer:', err);
+      setError('Trainer konnte nicht entfernt werden');
     } finally {
       setLoading(false);
     }
@@ -492,16 +557,14 @@ export default function Courses({
                     >
                       <Edit className="w-4 h-4" />
                     </button>
-                    {adminMode && deleteMode && (
-                      <button
-                        onClick={() => deleteCourse(course.id)}
-                        disabled={loading}
-                        className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded disabled:opacity-50"
-                        title="Kurs löschen"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteCourse(course.id)}
+                      disabled={loading}
+                      className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded disabled:opacity-50"
+                      title="Kurs löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
                 
@@ -555,22 +618,66 @@ export default function Courses({
                   return null;
                 })()}
                 
+                {/* ✅ NEU: Trainer-Dropdown mit intelligenter Sortierung */}
                 <div>
                   <h4 className="font-medium mb-2">Trainer zuweisen:</h4>
-                  <div className="space-y-2">
-                    {trainers.map(trainer => (
-                      <label key={trainer.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded">
-                        <input
-                          type="checkbox"
-                          className="mr-2 w-4 h-4"
-                          checked={course.assignedTrainerIds?.includes(trainer.id) || false}
-                          onChange={() => toggleTrainerAssignment(course.id, trainer.id)}
-                          disabled={loading}
-                        />
-                        <span>{getTrainerName(trainer)}</span>
-                      </label>
-                    ))}
-                  </div>
+                  
+                  {/* Zugewiesene Trainer anzeigen */}
+                  {course.assignedTrainerIds && course.assignedTrainerIds.length > 0 && (
+                    <div className="mb-3 space-y-1">
+                      {course.assignedTrainerIds.map(trainerId => {
+                        const trainer = trainers.find(t => t.id === trainerId);
+                        if (!trainer) return null;
+                        
+                        const isAvailable = trainer.availability?.includes(getCourseDayOfWeek(course));
+                        
+                        return (
+                          <div key={trainerId} className="flex items-center justify-between bg-green-50 border border-green-200 rounded px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <UserCheck className="w-4 h-4 text-green-600" />
+                              <span className="font-medium">{getTrainerName(trainer)}</span>
+                              {isAvailable && (
+                                <span className="text-xs text-green-600">✓ Verfügbar</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeTrainerFromCourse(course.id, trainerId)}
+                              disabled={loading}
+                              className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                              title="Entfernen"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Dropdown zum Hinzufügen */}
+                  <select
+                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                    value=""
+                    onChange={(e) => addTrainerToCourse(course.id, e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="">Trainer hinzufügen...</option>
+                    {getSortedTrainers(getCourseDayOfWeek(course)).map(trainer => {
+                      const isAssigned = course.assignedTrainerIds?.includes(trainer.id);
+                      const isAvailable = trainer.availability?.includes(getCourseDayOfWeek(course));
+                      
+                      if (isAssigned) return null; // Bereits zugewiesene Trainer ausblenden
+                      
+                      return (
+                        <option key={trainer.id} value={trainer.id}>
+                          {getTrainerName(trainer)} {isAvailable ? '✓' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ✓ = Verfügbar am {getCourseDayOfWeek(course)} · Sortiert nach Verfügbarkeit
+                  </p>
                 </div>
               </>
             )}
