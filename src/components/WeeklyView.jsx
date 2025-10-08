@@ -36,11 +36,19 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // Wochentage Array
   const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-  // Funktion um Trainer für eine bestimmte Woche zu bekommen
-  const getWeeklyTrainers = (course) => {
-    const key = `${course.id}-${weekNumber}-${year}`;
-    return weeklyAssignments[key] || [];
-  };
+// Funktion um Trainer für eine bestimmte Woche zu bekommen
+const getWeeklyTrainers = (course) => {
+  const key = `${course.id}-${weekNumber}-${year}`;
+  const weekly = weeklyAssignments[key];
+  
+  // ✅ FIX: Wenn keine wöchentlichen Zuweisungen existieren, verwende Standardtrainer
+  if (weekly === undefined || weekly === null) {
+    // Fallback zu Standardtrainern aus course.assignedTrainerIds
+    return course.assignedTrainerIds || [];
+  }
+  
+  return weekly;
+};
 
   // Funktion um zu prüfen ob es eine Ferienwoche ist
   const isHolidayWeek = () => {
