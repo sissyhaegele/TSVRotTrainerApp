@@ -130,7 +130,9 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
             firstName: newTrainer.firstName,
             lastName: newTrainer.lastName,
             email: newTrainer.email || null,
-            phone: newTrainer.phone || null
+            phone: newTrainer.phone || null,
+            availability: newTrainer.availability || [],
+            qualifications: newTrainer.qualifications || []
           })
         });
         
@@ -191,7 +193,9 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
           firstName: editingTrainer.firstName || editingTrainer.first_name,
           lastName: editingTrainer.lastName || editingTrainer.last_name,
           email: editingTrainer.email || null,
-          phone: editingTrainer.phone || null
+          phone: editingTrainer.phone || null,
+          availability: editingTrainer.availability || [],
+          qualifications: editingTrainer.qualifications || []
         })
       });
       
