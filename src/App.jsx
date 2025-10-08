@@ -3,7 +3,7 @@ import { Calendar, Users, BarChart3, Settings, Menu, X } from 'lucide-react';
 import Courses from './components/Courses';
 import Trainers from './components/Trainers';
 import StaffingOverview from './components/StaffingOverview';
-import WeeklyView from './WeeklyView';  // ✅ KORRIGIERT: WeeklyView ist in src/, nicht src/components/
+import WeeklyView from './components/WeeklyView';
 import Login from './components/Login';
 
 const API_URL = window.location.hostname === 'localhost' 
