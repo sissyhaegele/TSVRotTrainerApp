@@ -21,8 +21,9 @@ export default function App() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // ✅ GEÄNDERT: Standard-Tab ist jetzt 'weekly-plan' statt 'trainers'
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('tsvrot-activeTab') || 'trainers';
+    return localStorage.getItem('tsvrot-activeTab') || 'weekly-plan';
   });
   
   const [adminMode, setAdminMode] = useState(false);
@@ -155,15 +156,27 @@ export default function App() {
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         
-        {/* Sidebar */}
+        {/* Sidebar - ✅ WOCHENPLAN AN ERSTER STELLE */}
         <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-64 bg-white shadow-lg absolute lg:relative h-full z-40`}>
           <nav className="mt-5 px-2">
+            <button
+              onClick={() => {
+                setActiveTab('weekly-plan');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                activeTab === 'weekly-plan' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Calendar className="mr-3 h-5 w-5" />
+              Wochenplan
+            </button>
             <button
               onClick={() => {
                 setActiveTab('trainers');
                 setMobileMenuOpen(false);
               }}
-              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
                 activeTab === 'trainers' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -181,18 +194,6 @@ export default function App() {
             >
               <Calendar className="mr-3 h-5 w-5" />
               Kurse
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('weekly-plan');
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
-                activeTab === 'weekly-plan' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Calendar className="mr-3 h-5 w-5" />
-              Wochenplan
             </button>
             
             {canEdit && (
@@ -226,8 +227,15 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content - ✅ WOCHENPLAN AN ERSTER STELLE */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+          {activeTab === 'weekly-plan' && (
+            <WeeklyView
+              courses={courses}
+              trainers={trainers}
+              setCourses={setCourses}
+            />
+          )}
           {activeTab === 'trainers' && (
             <Trainers
               trainers={trainers}
@@ -243,13 +251,6 @@ export default function App() {
               trainers={trainers}
               deleteMode={deleteMode}
               adminMode={adminMode}
-            />
-          )}
-          {activeTab === 'weekly-plan' && (
-            <WeeklyView
-              courses={courses}
-              trainers={trainers}
-              setCourses={setCourses}
             />
           )}
           {activeTab === 'overview' && canEdit && (
