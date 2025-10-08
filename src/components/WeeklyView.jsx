@@ -266,7 +266,8 @@ useEffect(() => {
   const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${day}.${month}.`;
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
   };
 
   // Ausfall-Funktionen
@@ -426,7 +427,7 @@ const getTrainerName = (trainerId) => {
   const getStaffingStatus = (course) => {
     const weeklyTrainerIds = getWeeklyTrainers(course);
     const assigned = weeklyTrainerIds.length;
-    const required = course.requiredTrainers || 2;
+    const required = course.requiredTrainers || course.required_trainers || 2;
     
     if (assigned === 0) return { status: 'critical', color: 'red', message: 'Keine Trainer' };
     if (assigned < required) return { status: 'warning', color: 'yellow', message: `${required - assigned} fehlt` };
@@ -611,7 +612,7 @@ const getTrainerName = (trainerId) => {
                       <div className="flex-1">
                         {/* Zeit und Tag mit Datum */}
                         <div className="font-bold text-gray-900 text-sm sm:text-base">
-                          {course.dayOfWeek}, {formatDate(getDateForCourse(course.dayOfWeek))} · {course.startTime || '?'}
+                          {course.dayOfWeek || course.day_of_week}, {formatDate(getDateForCourse(course.dayOfWeek || course.day_of_week))} · {course.startTime || course.start_time || '?'}
                         </div>
                         {/* Kursname */}
                         <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
@@ -637,11 +638,11 @@ const getTrainerName = (trainerId) => {
                     <div className="mt-3 ml-8 grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4">
                       <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                         <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                        {course.endTime ? `bis ${course.endTime}` : '60 Min'}
+                        {course.endTime || course.end_time ? `bis ${course.endTime || course.end_time}` : '60 Min'}
                       </span>
                       <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                         <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                        {getWeeklyTrainers(course).length}/{course.requiredTrainers || 2}
+                        {getWeeklyTrainers(course).length}/{course.requiredTrainers || course.required_trainers || 2}
                       </span>
                     </div>
 
