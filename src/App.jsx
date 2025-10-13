@@ -132,7 +132,16 @@ function App() {
       <div className="bg-red-600 text-white shadow-lg fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14">
-            <h1 className="text-xl font-bold">TSV Rot Trainer-App</h1>
+            <div className="flex items-center gap-3">
+              {/* Mobile Menu Button - IM HEADER */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 hover:bg-red-700 rounded-md transition-colors"
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+              <h1 className="text-xl font-bold">TSV Rot Turnen</h1>
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center space-x-2 px-3 py-1.5 bg-red-700 rounded-lg hover:bg-red-800 transition-colors text-sm"
@@ -145,14 +154,6 @@ function App() {
       </div>
       
       <div className="flex h-screen pt-14">
-        {/* Mobile Menu Button - Fixed Position */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden fixed top-28 left-4 z-50 p-2 bg-red-600 text-white rounded-md shadow-lg w-10 h-10 flex items-center justify-center"
-        >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-        
         {/* Backdrop für Mobile Menu */}
         {mobileMenuOpen && (
           <div 
