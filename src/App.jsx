@@ -59,14 +59,14 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (password === 'trainer2024') {
+    if (password === 'TSVRot2024') {
       const userData = { name: 'Trainer', role: 'trainer' };
       localStorage.setItem('tsvrot-user', JSON.stringify(userData));
       setUser(userData);
       setAdminMode(false);
       setLoginError('');
       loadData();
-    } else if (password === 'admin2024') {
+    } else if (password === 'TSVAdmin2024') {
       const userData = { name: 'Admin', role: 'admin' };
       localStorage.setItem('tsvrot-user', JSON.stringify(userData));
       setUser(userData);
@@ -161,8 +161,13 @@ function App() {
           />
         )}
         
-        {/* Sidebar - ✅ WOCHENPLAN AN ERSTER STELLE */}
-        <div className={`${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative w-64 bg-white shadow-lg h-full z-40 transition-transform duration-300 ease-in-out`}>
+        {/* Sidebar - ✅ HIDDEN auf Mobile wenn geschlossen, FIXED als Overlay wenn offen */}
+        <div className={`
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          fixed lg:relative 
+          w-64 bg-white shadow-lg h-full z-40 
+          transition-transform duration-300 ease-in-out
+        `}>
           <nav className="mt-5 px-2">
             <button
               onClick={() => {
@@ -229,7 +234,8 @@ function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        {/* Content Area - Nimmt auf Desktop Platz NEBEN Sidebar, auf Mobile VOLLE Breite */}
+        <div className="flex-1 overflow-auto w-full">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             {loading && (
               <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative mb-4">
