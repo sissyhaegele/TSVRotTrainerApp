@@ -1,163 +1,168 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, BarChart3, Settings, Menu, X } from 'lucide-react';
+import { Calendar, Users, X, Menu, LogOut } from 'lucide-react';
+import WeeklyView from './components/WeeklyView';
 import Courses from './components/Courses';
 import Trainers from './components/Trainers';
-import StaffingOverview from './components/StaffingOverview';
-import WeeklyView from './components/WeeklyView';
-import Login from './components/Login';
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
   : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
 
-export default function App() {
-  // ========== 1. ALLE useState HOOKS ZUERST ==========
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState('');
-  
-  // ✅ KORRIGIERT: Keine localStorage-Initialisierung mehr, laden von DB
-  const [trainers, setTrainers] = useState([]);
+function App() {
+  const [activeTab, setActiveTab] = useState('weekly-plan');
   const [courses, setCourses] = useState([]);
-  const [sessions, setSessions] = useState([]);
+  const [trainers, setTrainers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // ✅ GEÄNDERT: Standard-Tab ist jetzt 'weekly-plan' statt 'trainers'
-  const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('tsvrot-activeTab') || 'weekly-plan';
-  });
-  
-  const [adminMode, setAdminMode] = useState(false);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [deleteMode, setDeleteMode] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // ========== 2. ALLE useEffect HOOKS ==========
-  
-  // Login Check
   useEffect(() => {
-    const loggedIn = localStorage.getItem('tsvrot-isLoggedIn');
-    const role = localStorage.getItem('tsvrot-role');
-    if (loggedIn === 'true') {
-      setIsLoggedIn(true);
-      setUserRole(role || 'trainer');
-      setAdminMode(role === 'admin');
+    const savedUser = localStorage.getItem('tsvrot-user');
+    if (savedUser) {
+      const userData = JSON.parse(savedUser);
+      setUser(userData);
+      setAdminMode(userData.role === 'admin');
+      loadData();
     }
   }, []);
 
-  // Lade Daten von Azure DB beim Start
-  useEffect(() => {
-    const loadData = async () => {
-      if (!isLoggedIn) return;
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [coursesRes, trainersRes] = await Promise.all([
+        fetch(`${API_URL}/courses`),
+        fetch(`${API_URL}/trainers`)
+      ]);
       
-      try {
-        setLoading(true);
-        
-        // Parallel laden für bessere Performance
-        const [trainersRes, coursesRes] = await Promise.all([
-          fetch(`${API_URL}/trainers`),
-          fetch(`${API_URL}/courses`)
-        ]);
-
-        if (trainersRes.ok) {
-          const trainersData = await trainersRes.json();
-          setTrainers(trainersData);
-        } else {
-          console.error('Failed to load trainers');
-        }
-
-        if (coursesRes.ok) {
-          const coursesData = await coursesRes.json();
-          setCourses(coursesData);
-        } else {
-          console.error('Failed to load courses');
-        }
-
-        // Sessions werden von TrainingSessions-Komponente geladen (Hybrid-System)
-        const localSessions = JSON.parse(localStorage.getItem('tsvrot-sessions') || '[]');
-        setSessions(localSessions);
-        
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        setLoading(false);
+      if (!coursesRes.ok || !trainersRes.ok) {
+        throw new Error('Fehler beim Laden der Daten');
       }
-    };
+      
+      const coursesData = await coursesRes.json();
+      const trainersData = await trainersRes.json();
+      
+      setCourses(coursesData);
+      setTrainers(trainersData);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Daten konnten nicht geladen werden. Bitte Seite neu laden.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadData();
-  }, [isLoggedIn]);
-
-  // Active Tab speichern
-  useEffect(() => {
-    localStorage.setItem('tsvrot-activeTab', activeTab);
-  }, [activeTab]);
-
-  // ========== 3. FUNKTIONEN ==========
-  const handleLogin = (role) => {
-    setIsLoggedIn(true);
-    setUserRole(role);
-    setAdminMode(role === 'admin');
-    localStorage.setItem('tsvrot-isLoggedIn', 'true');
-    localStorage.setItem('tsvrot-role', role);
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (password === 'trainer2024') {
+      const userData = { name: 'Trainer', role: 'trainer' };
+      localStorage.setItem('tsvrot-user', JSON.stringify(userData));
+      setUser(userData);
+      setAdminMode(false);
+      setLoginError('');
+      loadData();
+    } else if (password === 'admin2024') {
+      const userData = { name: 'Admin', role: 'admin' };
+      localStorage.setItem('tsvrot-user', JSON.stringify(userData));
+      setUser(userData);
+      setAdminMode(true);
+      setLoginError('');
+      loadData();
+    } else {
+      setLoginError('Falsches Passwort');
+    }
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserRole('');
+    localStorage.removeItem('tsvrot-user');
+    setUser(null);
     setAdminMode(false);
-    localStorage.removeItem('tsvrot-isLoggedIn');
-    localStorage.removeItem('tsvrot-role');
+    setPassword('');
   };
 
-  // ========== 4. LOGIN CHECK ==========
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  // ========== 5. BERECHTIGUNGEN ==========
-  const canEdit = userRole === 'admin';
-  const canAssignTrainers = userRole === 'admin' || userRole === 'trainer';
-
-  // ========== 6. LOADING STATE ==========
-  if (loading) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Lade Daten...</p>
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-red-600 mb-2">TSV Rot</h1>
+            <p className="text-gray-600">Trainer-Verwaltung</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Passwort
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="Passwort eingeben"
+                autoFocus
+              />
+            </div>
+            
+            {loginError && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                {loginError}
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-medium"
+            >
+              Anmelden
+            </button>
+          </form>
         </div>
       </div>
     );
   }
 
-  // ========== 7. RENDER ==========
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header mit Logout */}
-      <div className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-red-600">TSV Rot Trainer-Verwaltung</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
-            {userRole === 'admin' ? 'Administrator' : 'Trainer'}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-          >
-            Abmelden
-          </button>
+      <div className="bg-red-600 text-white shadow-lg fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14">
+            <h1 className="text-xl font-bold">TSV Rot Trainer-App</h1>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 px-3 py-1.5 bg-red-700 rounded-lg hover:bg-red-800 transition-colors text-sm"
+            >
+              <LogOut className="h-4 w-4" />
+              Abmelden
+            </button>
+          </div>
         </div>
       </div>
       
       <div className="flex h-screen pt-14">
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button - Fixed Position */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden sticky top-4 left-4 z-50 p-2 bg-red-600 text-white rounded-md shadow-lg ml-4 mt-4 w-10 h-10 flex items-center justify-center"
+          className="lg:hidden fixed top-20 left-4 z-50 p-2 bg-red-600 text-white rounded-md shadow-lg w-10 h-10 flex items-center justify-center"
         >
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         
+        {/* Backdrop für Mobile Menu */}
+        {mobileMenuOpen && (
+          <div 
+            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+        
         {/* Sidebar - ✅ WOCHENPLAN AN ERSTER STELLE */}
-        <div className={`${mobileMenuOpen ? 'block' : 'hidden'} lg:block w-64 bg-white shadow-lg absolute lg:relative h-full z-40`}>
+        <div className={`${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:relative w-64 bg-white shadow-lg h-full z-40 transition-transform duration-300 ease-in-out`}>
           <nav className="mt-5 px-2">
             <button
               onClick={() => {
@@ -173,18 +178,6 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                setActiveTab('trainers');
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
-                activeTab === 'trainers' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Users className="mr-3 h-5 w-5" />
-              Trainer
-            </button>
-            <button
-              onClick={() => {
                 setActiveTab('courses');
                 setMobileMenuOpen(false);
               }}
@@ -195,96 +188,90 @@ export default function App() {
               <Calendar className="mr-3 h-5 w-5" />
               Kurse
             </button>
-            
-            {canEdit && (
-              <>
-                <button
-                  onClick={() => {
-                    setActiveTab('overview');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
-                    activeTab === 'overview' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <BarChart3 className="mr-3 h-5 w-5" />
-                  Übersicht
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('admin');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-8 ${
-                    activeTab === 'admin' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <Settings className="mr-3 h-5 w-5" />
-                  Admin
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => {
+                setActiveTab('trainers');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'trainers' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="mr-3 h-5 w-5" />
+              Trainer
+            </button>
           </nav>
-        </div>
-
-        {/* Main Content - ✅ WOCHENPLAN AN ERSTER STELLE */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-          {activeTab === 'weekly-plan' && (
-            <WeeklyView
-              courses={courses}
-              trainers={trainers}
-              setCourses={setCourses}
-            />
-          )}
-          {activeTab === 'trainers' && (
-            <Trainers
-              trainers={trainers}
-              setTrainers={setTrainers}
-              deleteMode={deleteMode}
-              adminMode={adminMode}
-            />
-          )}
-          {activeTab === 'courses' && (
-            <Courses
-              courses={courses}
-              setCourses={setCourses}
-              trainers={trainers}
-              deleteMode={deleteMode}
-              adminMode={adminMode}
-            />
-          )}
-          {activeTab === 'overview' && canEdit && (
-            <StaffingOverview courses={courses} />
-          )}
           
-          {activeTab === 'admin' && canEdit && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold mb-4">Admin Einstellungen</h2>
-              <div className="space-y-4">
-                <label className="flex items-center">
+          {adminMode && (
+            <div className="mt-8 px-4">
+              <div className="border-t pt-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                  Admin-Funktionen
+                </p>
+                <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer hover:text-red-600">
                   <input
                     type="checkbox"
                     checked={deleteMode}
                     onChange={(e) => setDeleteMode(e.target.checked)}
-                    className="mr-2"
+                    className="rounded text-red-600 focus:ring-red-500"
                   />
-                  <span>Löschmodus aktivieren</span>
+                  <span>Lösch-Modus</span>
                 </label>
-                
-                <div className="mt-6 pt-6 border-t">
-                  <h3 className="font-semibold mb-2">System-Info</h3>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>Trainer: {trainers.length}</p>
-                    <p>Kurse: {courses.length}</p>
-                    <p>Backend: Azure Cloud Database</p>
-                    <p>Version: 2.0 (Cloud-Sync)</p>
-                  </div>
-                </div>
               </div>
             </div>
           )}
+          
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
+            <div className="text-xs text-gray-500">
+              <p>Angemeldet als: <span className="font-medium">{user.name}</span></p>
+              <p className="mt-1">Rolle: <span className="font-medium">{adminMode ? 'Admin' : 'Trainer'}</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            {loading && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative mb-4">
+                Lade Daten...
+              </div>
+            )}
+            
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative mb-4">
+                {error}
+              </div>
+            )}
+
+            {activeTab === 'weekly-plan' && (
+              <WeeklyView 
+                courses={courses} 
+                trainers={trainers}
+                setCourses={setCourses}
+              />
+            )}
+            {activeTab === 'courses' && (
+              <Courses 
+                courses={courses} 
+                setCourses={setCourses} 
+                trainers={trainers}
+                deleteMode={deleteMode}
+                adminMode={adminMode}
+              />
+            )}
+            {activeTab === 'trainers' && (
+              <Trainers 
+                trainers={trainers} 
+                setTrainers={setTrainers}
+                deleteMode={deleteMode}
+                adminMode={adminMode}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+export default App;
