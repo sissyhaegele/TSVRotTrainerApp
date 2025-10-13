@@ -30,3 +30,7 @@ yarn-error.log*
 PROJEKT_ZUSAMMENFASSUNG_FÃœR_NEUEN_CHAT.md
 DigiCertGlobalRootG2.crt.pem
 create_tables.py
+
+
+# Projekt-Dokumentation (lokal, nicht für GitHub)
+TSV_ROT_PROJEKT_ZUSAMMENFASSUNG.md
