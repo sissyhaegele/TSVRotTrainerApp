@@ -116,7 +116,8 @@ useEffect(() => {
     const updates = {};
     courses.forEach(course => {
       const key = `${course.id}-${weekNum}-${year}`;
-      if (weeklyAssignments[key]) {
+      // ✅ FIX: Speichere auch leere Arrays (wenn alle Trainer entfernt wurden)
+      if (weeklyAssignments[key] !== undefined) {
         updates[course.id] = weeklyAssignments[key];
       }
     });
@@ -508,12 +509,8 @@ const getTrainerName = (trainerId) => {
         </button>
       </div>
       
-      {/* Header mit Filter */}
-      <div className="mb-4 flex flex-col sm:flex-row sm:justify-between gap-3">
-        <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
-          <Calendar className="w-5 h-5" />
-          <span>Wochenplan</span>
-        </h2>
+      {/* Filter ohne "Wochenplan" Überschrift */}
+      <div className="mb-4 flex justify-end">
         <select
           value={selectedDay}
           onChange={(e) => setSelectedDay(e.target.value)}
