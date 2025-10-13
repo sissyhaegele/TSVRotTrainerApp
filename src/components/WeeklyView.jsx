@@ -15,7 +15,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   
   const [holidayWeeks, setHolidayWeeks] = useState(new Set());
   
-// Wochenspezifische Trainer-Zuweisungen
+  // Wochenspezifische Trainer-Zuweisungen
   const [weeklyAssignments, setWeeklyAssignments] = useState({});
 
   // KW berechnen - ZUERST definieren
@@ -232,9 +232,37 @@ useEffect(() => {
   }
 };
 
-  // ✅ FIXED: Stunden speichern mit korrekten Parametern
+  // ✅ NEU: Prüfe ob Woche bereits in DB gespeichert wurde
+  const checkIfWeekSaved = async (weekNum, yearNum) => {
+    try {
+      // Prüfe ob für diese Woche bereits Einträge existieren
+      const response = await fetch(
+        `${API_URL}/training-sessions/week/${weekNum}/${yearNum}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.length > 0; // True wenn Einträge existieren
+      }
+      return false;
+    } catch (error) {
+      console.error('Fehler beim Prüfen der Woche:', error);
+      return false;
+    }
+  };
+
+  // ✅ FIXED: Stunden speichern mit Duplikat-Prüfung via DB
   const saveWeekHours = async (weekNum, yearNum) => {
     console.log(`💾 Speichere Stunden für KW ${weekNum}/${yearNum}...`);
+    
+    // Prüfe ob diese Woche bereits gespeichert wurde
+    const alreadySaved = await checkIfWeekSaved(weekNum, yearNum);
+    
+    if (alreadySaved) {
+      console.log(`⏭️  KW ${weekNum}/${yearNum} hat bereits gespeicherte Einträge`);
+      console.log(`ℹ️  Hinweis: Änderungen an Trainer-Zuweisungen werden automatisch gespeichert`);
+      return 0;
+    }
     
     let savedCount = 0;
     
@@ -289,18 +317,17 @@ useEffect(() => {
     return savedCount;
   };
 
-  // ✅ FIXED: Woche wechseln - Stunden VORHER speichern
+  // ✅ FIXED: Woche wechseln - DB-Check statt lokalem Tracking
   const changeWeek = async (direction) => {
     // Beim Vorwärts-Wechsel: Stunden der AKTUELLEN Woche speichern
     if (direction === 1) {
       try {
         const count = await saveWeekHours(weekNumber, year);
         if (count > 0) {
-          // Optional: Toast-Notification zeigen
-          console.log(`✅ ${count} Trainingseinheiten wurden gespeichert`);
+          console.log(`✅ ${count} neue Trainingseinheiten gespeichert`);
         }
       } catch (error) {
-        console.error('Fehler beim Speichern der Stunden:', error);
+        console.error('❌ Fehler beim Speichern der Stunden:', error);
       }
     }
     
