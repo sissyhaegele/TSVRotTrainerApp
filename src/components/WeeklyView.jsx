@@ -133,7 +133,7 @@ useEffect(() => {
       });
       
       if (response.ok) {
-        console.log('Batch save successful');
+        console.log('✅ Trainer-Zuweisungen gespeichert');
       }
     } catch (error) {
       console.error('Error saving batch assignments:', error);
@@ -232,43 +232,82 @@ useEffect(() => {
   }
 };
 
-  // Stunden speichern
-  const saveWeekHours = async () => {
-  courses.forEach(course => {
-    if (isCourseCancel(course.id)) {
-      return;
-    }
+  // ✅ FIXED: Stunden speichern mit korrekten Parametern
+  const saveWeekHours = async (weekNum, yearNum) => {
+    console.log(`💾 Speichere Stunden für KW ${weekNum}/${yearNum}...`);
     
-    const weeklyTrainerIds = getWeeklyTrainers(course);
-    if (weeklyTrainerIds.length > 0) {
+    let savedCount = 0;
+    
+    for (const course of courses) {
+      // Skip ausgefallene Kurse
+      const cancelKey = `${course.id}-${weekNum}-${yearNum}`;
+      const holidayKey = `${weekNum}-${yearNum}`;
+      if (cancelledCourses.has(cancelKey) || holidayWeeks.has(holidayKey)) {
+        console.log(`  ⏭️ Überspringe ${course.name} (ausgefallen)`);
+        continue;
+      }
+      
+      // Hole Trainer-Zuweisungen für diese spezifische Woche
+      const key = `${course.id}-${weekNum}-${yearNum}`;
+      const weeklyTrainerIds = weeklyAssignments[key] || [];
+      
+      if (weeklyTrainerIds.length === 0) {
+        console.log(`  ⏭️ Überspringe ${course.name} (keine Trainer)`);
+        continue;
+      }
+      
       const hours = calculateHours(course.startTime, course.endTime);
       
-      weeklyTrainerIds.forEach(async trainerId => {
-        await fetch(`${API_URL}/training-sessions`, {   // OHNE /api davor!
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            week_number: weekNumber,
-            year: year,
-            course_id: course.id,
-            trainer_id: trainerId,
-            hours: hours || 1,
-            status: 'done'
-          })
-        });
-      });
+      for (const trainerId of weeklyTrainerIds) {
+        try {
+          const response = await fetch(`${API_URL}/training-sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              week_number: weekNum,
+              year: yearNum,
+              course_id: course.id,
+              trainer_id: trainerId,
+              hours: hours || 1,
+              status: 'done'
+            })
+          });
+          
+          if (response.ok) {
+            savedCount++;
+            console.log(`  ✅ Gespeichert: ${course.name} - Trainer ${trainerId} - ${hours}h`);
+          } else {
+            console.error(`  ❌ Fehler beim Speichern: ${course.name}`, await response.text());
+          }
+        } catch (error) {
+          console.error(`  ❌ Fehler beim Speichern:`, error);
+        }
+      }
     }
-  });
-};
+    
+    console.log(`✅ Fertig! ${savedCount} Einheiten gespeichert`);
+    return savedCount;
+  };
 
-  // Woche wechseln
-  const changeWeek = (direction) => {
+  // ✅ FIXED: Woche wechseln - Stunden VORHER speichern
+  const changeWeek = async (direction) => {
+    // Beim Vorwärts-Wechsel: Stunden der AKTUELLEN Woche speichern
+    if (direction === 1) {
+      try {
+        const count = await saveWeekHours(weekNumber, year);
+        if (count > 0) {
+          // Optional: Toast-Notification zeigen
+          console.log(`✅ ${count} Trainingseinheiten wurden gespeichert`);
+        }
+      } catch (error) {
+        console.error('Fehler beim Speichern der Stunden:', error);
+      }
+    }
+    
+    // Dann zur neuen Woche wechseln
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() + (direction * 7));
     setCurrentWeek(newDate);
-    
-    // Stunden speichern beim Wechsel
-    saveWeekHours();
   };
 
   // Datum-Funktionen
@@ -497,7 +536,7 @@ const getTrainerName = (trainerId) => {
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {isHolidayWeek() ? '🏖️ Ferien aktiv' : '🏖️ Als Ferien markieren'}
+            {isHolidayWeek() ? '🖏️ Ferien aktiv' : '🖏️ Als Ferien markieren'}
           </button>
         </div>
         
@@ -712,7 +751,7 @@ const getTrainerName = (trainerId) => {
                         >
                           {isCourseCancel(course.id) ? (
                             <>
-                              <span>✔</span>
+                              <span>✓</span>
                               <span>Kurs reaktivieren</span>
                             </>
                           ) : (
