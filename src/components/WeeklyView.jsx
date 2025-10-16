@@ -17,11 +17,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // Wochenspezifische Trainer-Zuweisungen
   const [weeklyAssignments, setWeeklyAssignments] = useState({});
   
-  // NEU v2.1.0: State für Stundenerfassung
+  // v2.2.0: State für Stundenerfassung
   const [weekStatus, setWeekStatus] = useState({});
   const [finalizingWeek, setFinalizingWeek] = useState(false);
 
-  // KW berechnen - ZUERST definieren
+  // KW berechnen
   const getWeekNumber = (date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const dayNum = d.getUTCDay() || 7;
@@ -64,12 +64,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
-  // Funktion um zu prüfen ob es eine Ferienwoche ist
+  // Prüfe ob es eine Ferienwoche ist
   const isHolidayWeek = () => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
   };
 
-  // NEU v2.1.0: Lade Woche-Status beim Mount und bei Wechsel
+  // Lade Woche-Status beim Mount und bei Wechsel
   useEffect(() => {
     const loadWeekStatus = async () => {
       try {
@@ -79,7 +79,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         if (response.ok) {
           const data = await response.json();
           setWeekStatus(data);
-          console.log(`📊 Woche ${weekNumber}/${year}: ${data.sessionCount} Stunden erfasst`);
+          console.log(`📊 KW ${weekNumber}/${year}: ${data.sessionCount} Stunden erfasst (${data.totalHours}h)`);
         }
       } catch (error) {
         console.error('Fehler beim Laden des Woche-Status:', error);
@@ -89,7 +89,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     loadWeekStatus();
   }, [weekNumber, year]);
 
-  // Weekly Assignments vom Server laden - OPTIMIERT mit Batch-Loading
+  // Weekly Assignments vom Server laden - mit Batch-Loading
   useEffect(() => {
     const loadWeeklyAssignments = async () => {
       const weekNum = getWeekNumber(currentWeek);
@@ -145,7 +145,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         });
         
         if (response.ok) {
-          console.log('✅ Trainer-Zuweisungen gespeichert');
+          console.log('💾 Trainer-Zuweisungen gespeichert');
         }
       } catch (error) {
         console.error('Error saving batch assignments:', error);
@@ -209,57 +209,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return (endH + endM/60) - (startH + startM/60);
   };
 
-  // Wochenspezifische Keys und Getter/Setter
-  const getWeeklyKey = (courseId) => {
-    return `${courseId}-${weekNumber}-${year}`;
-  };
-
-  const setWeeklyTrainers = async (courseId, trainerIds) => {
-    const key = getWeeklyKey(courseId);
-    
-    try {
-      const response = await fetch(`${API_URL}/weekly-assignments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          course_id: courseId,
-          week_number: weekNumber,
-          year: year,
-          trainer_ids: trainerIds
-        })
-      });
-      
-      if (response.ok) {
-        setWeeklyAssignments(prev => ({
-          ...prev,
-          [key]: trainerIds
-        }));
-      }
-    } catch (error) {
-      console.error('Fehler beim Speichern der Zuweisung:', error);
-      alert('Fehler beim Speichern der Trainer-Zuweisung');
-    }
-  };
-
-  // Prüfe ob Woche bereits in DB gespeichert wurde
-  const checkIfWeekSaved = async (weekNum, yearNum) => {
-    try {
-      const response = await fetch(
-        `${API_URL}/training-sessions/week/${weekNum}/${yearNum}/check`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.weekSaved;
-      }
-      return false;
-    } catch (error) {
-      console.error('Fehler beim Prüfen der Woche:', error);
-      return false;
-    }
-  };
-
-  // NEU v2.1.0: Finale Erfassung einer Woche
+  // v2.2.0: Finale Erfassung einer Woche mit Differenz-Logik
   const finalizeWeek = async (weekNum, yearNum) => {
     console.log(`📝 Finalisiere KW ${weekNum}/${yearNum}...`);
     
@@ -276,35 +226,39 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
       const result = await response.json();
       
       if (result.success) {
-        console.log(`✅ ${result.sessionCount} Stunden erfasst`);
+        console.log(`✅ Änderungen gespeichert: +${result.changes.added} | -${result.changes.deleted}`);
+        console.log(`📊 Total: ${result.changes.totalSessions} Sessions (${result.changes.totalHours}h)`);
+        
         if (result.details && result.details.length > 0) {
           console.table(result.details);
         }
-        return result.sessionCount;
-      } else if (result.weekSaved) {
-        console.log(`ℹ️ Woche ${weekNum}/${yearNum} war bereits gespeichert`);
-        return 0;
+        
+        // Update Status nach Speicherung
+        setWeekStatus({
+          weekSaved: result.changes.totalSessions > 0,
+          sessionCount: result.changes.totalSessions,
+          totalHours: result.changes.totalHours
+        });
+        
+        return result.changes;
       } else {
-        console.log(`ℹ️ Keine Trainer zugewiesen für diese Woche`);
-        return 0;
+        console.log(`ℹ️ Keine Änderungen für KW ${weekNum}/${yearNum}`);
+        return { added: 0, deleted: 0, totalSessions: 0 };
       }
     } catch (error) {
       console.error('Fehler bei Finalisierung:', error);
       alert('Fehler beim Erfassen der Stunden!');
-      return 0;
+      return { added: 0, deleted: 0, totalSessions: 0 };
     }
   };
 
-  // NEU v2.1.0: Woche wechseln mit Finalisierung
+  // v2.2.0: Woche wechseln mit Finalisierung
   const changeWeek = async (direction) => {
     // Beim Vorwärts-Wechsel: Stunden finalisieren
-    if (direction === 1 && !weekStatus.weekSaved) {
+    if (direction === 1) {
       setFinalizingWeek(true);
       try {
         await finalizeWeek(weekNumber, year);
-        // Lade neuen Status
-        const newStatus = await checkIfWeekSaved(weekNumber, year);
-        setWeekStatus({ weekSaved: newStatus, sessionCount: newStatus ? 1 : 0 });
       } finally {
         setFinalizingWeek(false);
       }
@@ -459,7 +413,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return `${firstName} ${lastName}`;
   };
 
-  // Dropdown-basierte Trainer-Zuweisung
+  // Trainer hinzufügen
   const addTrainerToCourse = (courseId, trainerId) => {
     if (!trainerId) return;
     
@@ -513,14 +467,15 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
   };
 
-  // ===== RENDER =====
+  // RENDER
   return (
     <div>
-      {/* KW Navigation mit Ferien-Button und Status */}
+      {/* KW Navigation */}
       <div className="mb-3 flex items-center justify-between bg-white p-3 rounded-lg border">
         <button 
           onClick={() => changeWeek(-1)} 
           className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+          disabled={finalizingWeek}
         >
           ←
         </button>
@@ -529,7 +484,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           <div className="font-bold">KW {weekNumber}/{year}</div>
           {weekStatus.weekSaved && (
             <div className="text-xs text-green-600 mt-1">
-              ✅ {weekStatus.sessionCount} Stunden erfasst
+              ✅ {weekStatus.sessionCount} Sessions ({weekStatus.totalHours}h)
             </div>
           )}
           <button
@@ -540,7 +495,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {isHolidayWeek() ? '🖍️ Ferien aktiv' : '🖍️ Als Ferien markieren'}
+            {isHolidayWeek() ? '🏖️ Ferien aktiv' : '🏖️ Als Ferien markieren'}
           </button>
         </div>
         
@@ -586,7 +541,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           return (
             <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
               <div className="p-3 sm:p-4">
-                {/* Ausfall-Banner */}
                 {isCourseCancel(course.id) && (
                   <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2">
                     <span className="text-lg">🚫</span>
@@ -596,14 +550,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                   </div>
                 )}
                 
-                {/* Kurs-Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-start gap-2 sm:gap-3">
                       <button
                         onClick={() => toggleCourseExpansion(course.id)}
-                        className="mt-1 p-1 hover:bg-white hover:bg-opacity-50 rounded-full touch-manipulation"
-                        aria-label={isExpanded ? 'Zuklappen' : 'Aufklappen'}
+                        className="mt-1 p-1 hover:bg-white hover:bg-opacity-50 rounded-full"
                       >
                         {isExpanded ? 
                           <ChevronDown className="w-5 h-5" /> : 
@@ -611,22 +563,18 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                         }
                       </button>
                       <div className="flex-1">
-                        {/* Zeit und Tag mit Datum */}
                         <div className="font-bold text-gray-900 text-sm sm:text-base">
                           {course.dayOfWeek || course.day_of_week}, {formatDate(getDateForCourse(course.dayOfWeek || course.day_of_week))} · {course.startTime || course.start_time || '?'}
                         </div>
-                        {/* Kursname */}
                         <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
                           {course.name}
                         </div>
-                        {/* Location */}
                         {course.location && (
                           <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mt-1">
                             <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                             {course.location}
                           </div>
                         )}
-                        {/* Kategorie Badge */}
                         {course.category && (
                           <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                             {course.category}
@@ -635,7 +583,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                       </div>
                     </div>
 
-                    {/* Status Info */}
                     <div className="mt-3 ml-8 grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4">
                       <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
                         <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -647,7 +594,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                       </span>
                     </div>
 
-                    {/* Status Badge */}
                     <div className="mt-3 ml-8">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                         status.color === 'green' ? 'bg-green-100 text-green-800' :
@@ -659,7 +605,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                       </span>
                     </div>
 
-                    {/* Zugewiesene Trainer */}
                     {(() => {
                       const weeklyTrainerIds = getWeeklyTrainers(course);
                       return weeklyTrainerIds.length > 0 && (
@@ -678,13 +623,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                   </div>
                 </div>
 
-                {/* Expanded Section */}
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="sm:ml-9">
                       <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer zuweisen:</h4>
                       
-                      {/* Zugewiesene Trainer anzeigen */}
                       {(() => {
                         const weeklyTrainerIds = getWeeklyTrainers(course);
                         const courseDayOfWeek = course.dayOfWeek || course.day_of_week;
@@ -720,7 +663,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                         );
                       })()}
                       
-                      {/* Dropdown zum Hinzufügen */}
                       <select
                         className="w-full px-3 py-2 border rounded-lg bg-white"
                         value=""
@@ -745,14 +687,13 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                         })}
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week} · Sortiert nach Verfügbarkeit
+                        ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week}
                       </p>
                       
-                      {/* Kurs ausfallen lassen / reaktivieren */}
                       <div className="mt-4 pt-4 border-t">
                         <button
                           onClick={() => toggleCourseCancellation(course.id)}
-                          className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 touch-manipulation ${
+                          className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${
                             isCourseCancel(course.id)
                               ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
                               : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
@@ -772,7 +713,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                         </button>
                         {isCourseCancel(course.id) && !isHolidayWeek() && (
                           <p className="text-xs text-gray-600 mt-2">
-                            Dieser Kurs ist für diese Woche ausgefallen und wird nicht abgerechnet.
+                            Dieser Kurs ist für diese Woche ausgefallen.
                           </p>
                         )}
                       </div>
@@ -785,14 +726,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         })}
       </div>
 
-      {/* Leere-State */}
       {filteredCourses.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
           Keine Kurse für {selectedDay === 'Alle' ? 'diese Auswahl' : selectedDay} vorhanden.
         </div>
       )}
 
-      {/* Legende */}
       <div className="mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
         <h3 className="font-semibold text-xs sm:text-sm mb-2">Legende:</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs sm:text-sm">
