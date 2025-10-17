@@ -121,45 +121,52 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   }, [selectedWeek, courses.length]);
 
-  // Auto-Save für Weekly Assignments bei Änderungen
+  // FIX v2.3.1: Auto-Save für Weekly Assignments - NUR aktuelle Woche speichern!
   useEffect(() => {
-    const saveAllWeeklyAssignments = async () => {
+    const saveWeeklyAssignments = async () => {
       const weekNum = getWeekNumber(currentWeek);
       const year = currentWeek.getFullYear();
       
-      const updates = {};
+      // WICHTIG: Sammle nur die Zuweisungen der AKTUELLEN Woche
+      const currentWeekAssignments = {};
       courses.forEach(course => {
         const key = `${course.id}-${weekNum}-${year}`;
         if (weeklyAssignments[key] !== undefined) {
-          updates[course.id] = weeklyAssignments[key];
+          currentWeekAssignments[course.id] = weeklyAssignments[key];
         }
       });
       
-      if (Object.keys(updates).length === 0) return;
+      if (Object.keys(currentWeekAssignments).length === 0) return;
       
       try {
-        const response = await fetch(`${API_URL}/weekly-assignments/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates, weekNumber: weekNum, year })
-        });
-        
-        if (response.ok) {
-          console.log('💾 Trainer-Zuweisungen gespeichert');
+        // Speichere JEDEN Kurs einzeln, nicht als Batch für die ganze Woche
+        for (const [courseId, trainerIds] of Object.entries(currentWeekAssignments)) {
+          await fetch(`${API_URL}/weekly-assignments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              course_id: parseInt(courseId),
+              week_number: weekNum,
+              year: year,
+              trainer_ids: trainerIds
+            })
+          });
         }
+        
+        console.log(`💾 Trainer-Zuweisungen für KW ${weekNum}/${year} gespeichert`);
       } catch (error) {
-        console.error('Error saving batch assignments:', error);
+        console.error('Error saving assignments:', error);
       }
     };
     
     const timeoutId = setTimeout(() => {
       if (Object.keys(weeklyAssignments).length > 0) {
-        saveAllWeeklyAssignments();
+        saveWeeklyAssignments();
       }
     }, 2000);
     
     return () => clearTimeout(timeoutId);
-  }, [weeklyAssignments, courses, selectedWeek]);
+  }, [weeklyAssignments, courses, currentWeek]);
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
@@ -438,7 +445,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
-  // Trainer entfernen
+  // Trainer entfernen - FIX v2.3.1: Korrekt nur einen entfernen
   const removeTrainerFromCourse = (courseId, trainerId) => {
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
@@ -449,9 +456,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     
     setWeeklyAssignments(prev => {
       const currentAssignments = prev[key] || [];
+      const filtered = currentAssignments.filter(id => id !== parseInt(trainerId));
+      
       return {
         ...prev,
-        [key]: currentAssignments.filter(id => id !== trainerId)
+        [key]: filtered
       };
     });
   };
