@@ -39,29 +39,6 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
     loadTrainers();
   }, []);
 
- // ✅ Lade Stunden von Azure DB beim Start
-  useEffect(() => {
-    if (trainers.length > 0) {
-      loadTrainerHours();
-    }
-  }, [trainers.length]);
-
-  const loadTrainers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/trainers`);
-      if (!response.ok) throw new Error('Fehler beim Laden der Trainer');
-      const data = await response.json();
-      setTrainers(data);
-      setError(null);
-    } catch (err) {
-      console.error('Error loading trainers:', err);
-      setError('Trainer konnten nicht geladen werden');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ✅ NEU: Stunden von Azure DB laden statt localStorage
   const loadTrainerHours = async () => {
     try {
@@ -98,6 +75,17 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
           return merged;
         });
       }
+    } catch (err) {
+      console.error('Error loading trainer hours:', err);
+    }
+  };
+
+  // ✅ Lade Stunden von Azure DB wenn Trainer geladen sind
+  useEffect(() => {
+    if (trainers.length > 0) {
+      loadTrainerHours();
+    }
+  }, [trainers.length]);
     } catch (err) {
       console.error('Error loading trainer hours:', err);
     }
