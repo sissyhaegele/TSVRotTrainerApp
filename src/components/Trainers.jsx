@@ -86,8 +86,20 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       loadTrainerHours();
     }
   }, [trainers.length]);
+
+  const loadTrainers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/trainers`);
+      if (!response.ok) throw new Error('Fehler beim Laden der Trainer');
+      const data = await response.json();
+      setTrainers(data);
+      setError(null);
     } catch (err) {
-      console.error('Error loading trainer hours:', err);
+      console.error('Error loading trainers:', err);
+      setError('Trainer konnten nicht geladen werden');
+    } finally {
+      setLoading(false);
     }
   };
 
