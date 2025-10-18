@@ -268,17 +268,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     // v2.3.5: Schließe alle offenen Kurse BEVOR Woche wechselt
     setExpandedCourses(new Set());
     
-    // Beim Vorwärts-Wechsel: Stunden finalisieren
-    if (direction === 1) {
-      setFinalizingWeek(true);
-      try {
-        await finalizeWeek(weekNumber, year);
-      } finally {
-        setFinalizingWeek(false);
-      }
-    }
-    
-    // Dann zur neuen Woche wechseln
+    // Zur neuen Woche wechseln
+    // (finalize-week nicht mehr nötig - sync-past-days beim App-Load macht das automatisch)
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() + (direction * 7));
     setCurrentWeek(newDate);
