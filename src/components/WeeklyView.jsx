@@ -213,15 +213,17 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     loadHolidayWeeks();
   }, [weekNumber, year]);
 
- // v2.3.5: Scroll-Listener - schließe expandierte Kurse beim Scroll-Down
+// v2.3.5: Scroll-Listener - schließe expandierte Kurse beim Scroll-Down
 useEffect(() => {
   let lastScrollY = 0;
   
   const handleScroll = () => {
     const currentScrollY = window.scrollY;
+    console.log(`📜 Scroll: ${lastScrollY} → ${currentScrollY}`); // DEBUG
     
     // Schließe expandierte Kurse nur wenn nach unten gescrollt wird
     if (currentScrollY > lastScrollY) {
+      console.log(`⬇️ Nach unten gescrollt! Schließe Kurse...`); // DEBUG
       setExpandedCourses(new Set());
     }
     
@@ -230,7 +232,7 @@ useEffect(() => {
 
   window.addEventListener('scroll', handleScroll);
   return () => window.removeEventListener('scroll', handleScroll);
-}, []); // Leeres Dependency Array!
+}, []);
 
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
