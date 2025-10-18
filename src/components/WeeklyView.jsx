@@ -9,6 +9,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [expandedCourses, setExpandedCourses] = useState(new Set());
   const [selectedDay, setSelectedDay] = useState('Alle');
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [lastScrollY, setLastScrollY] = useState(0); // v2.3.5: Scroll-Tracking für UX
   
   // State für Ausfälle und Ferien
   const [cancelledCourses, setCancelledCourses] = useState(new Set());
@@ -212,6 +213,23 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     loadHolidayWeeks();
   }, [weekNumber, year]);
 
+  // v2.3.5: Scroll-Listener - schließe expandierte Kurse beim Scroll-Down
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // Schließe expandierte Kurse nur wenn nach unten gescrollt wird
+      if (currentScrollY > lastScrollY && expandedCourses.size > 0) {
+        setExpandedCourses(new Set());
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY, expandedCourses]);
+
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
     if (!start || !end) return 1;
@@ -265,6 +283,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
   // v2.2.0: Woche wechseln mit Finalisierung
   const changeWeek = async (direction) => {
+    // v2.3.5: Schließe alle offenen Kurse BEVOR Woche wechselt
+    setExpandedCourses(new Set());
+    
     // Beim Vorwärts-Wechsel: Stunden finalisieren
     if (direction === 1) {
       setFinalizingWeek(true);
