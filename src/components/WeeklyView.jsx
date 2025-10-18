@@ -73,6 +73,29 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
   // Lade Woche-Status beim Mount und bei Wechsel
   useEffect(() => {
+    const syncPastDays = async () => {
+      try {
+        const response = await fetch(`${API_URL}/training-sessions/sync-past-days`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Sync abgeschlossen: ${data.synced} gesynct, ${data.skipped} übersprungen`);
+        } else {
+          console.error(`❌ Sync fehlgeschlagen: ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Sync error:', error);
+      }
+    };
+    
+    // Sync beim App-Start - nur 1x!
+    syncPastDays();
+  }, []); // Leeres dependency array = nur beim Mount!
+
+  useEffect(() => {
     const loadWeekStatus = async () => {
       try {
         const response = await fetch(
