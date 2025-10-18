@@ -525,43 +525,32 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   )}
                 </div>
 
-                {/* Stunden-Statistik */}
+              {/* Stunden-Statistik */}
                 <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-3 mb-3 border border-blue-100">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                      {trainerStats[trainer.id]?.totalHours || 0}
+                        3
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />
-                        Stunden
+                        Einheiten/Woche
                       </div>
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-green-600">
-                        {trainerStats[trainer.id]?.totalSessions || 0}
+                        {trainerStats[trainer.id]?.totalHours || 0}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Einheiten
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                        2025
                       </div>
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-gray-600">
-                       {trainerStats[trainer.id]?.totalSessions > 0 
-                        ? Math.round((trainerStats[trainer.id].totalHours / trainerStats[trainer.id].totalSessions) * 100)
-                        : 100}%
+                        {trainerStats[trainer.id]?.monthlyHours || 0}
                       </div>
-                      <div className="text-xs text-gray-600">Quote</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-blue-100">
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>
-                        <TrendingUp className="w-3 h-3 inline mr-1" />
-                        Diesen Monat: {trainerStats[trainer.id]?.monthlyHours || 0} Std.
-                      </span>
-                      <span>{new Date().getFullYear()}</span>
+                      <div className="text-xs text-gray-600">Oktober</div>
                     </div>
                   </div>
                 </div>
