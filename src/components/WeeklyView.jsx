@@ -215,6 +215,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
  // v2.3.5: Scroll-Listener - schließe expandierte Kurse beim Scroll-Down
 useEffect(() => {
+  let lastScrollY = 0;
+  
   const handleScroll = () => {
     const currentScrollY = window.scrollY;
     
@@ -223,12 +225,12 @@ useEffect(() => {
       setExpandedCourses(new Set());
     }
     
-    setLastScrollY(currentScrollY);
+    lastScrollY = currentScrollY;
   };
 
   window.addEventListener('scroll', handleScroll);
   return () => window.removeEventListener('scroll', handleScroll);
-}, [lastScrollY]);
+}, []); // Leeres Dependency Array!
 
   // Hilfsfunktionen
   const calculateHours = (start, end) => {
