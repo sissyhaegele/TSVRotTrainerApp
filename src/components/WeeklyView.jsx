@@ -14,7 +14,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const [cancelledCourses, setCancelledCourses] = useState(new Set());
   const [holidayWeeks, setHolidayWeeks] = useState(new Set());
   
-  // Wochenspezifische Trainer-Zuweisungen (NUR MANUELLE, nicht Defaults!)
+  // v2.3.4: Wochenspezifische Trainer-Zuweisungen (ALLE Änderungen)
   const [weeklyAssignments, setWeeklyAssignments] = useState({});
   
   // v2.2.0: State für Stundenerfassung
@@ -37,23 +37,18 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // Wochentage Array
   const daysOfWeek = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-  // v2.3.3 FIX: Kombiniere Default-Trainer + Manuell hinzugefügte
+  // v2.3.4: Gib die Trainer zurück (geladen oder Defaults)
   const getWeeklyTrainers = (course) => {
     const key = `${course.id}-${weekNumber}-${year}`;
     const weekly = weeklyAssignments[key];
     
-    // Default-Trainer (aus Kurszuordnung)
-    const defaults = course.assignedTrainerIds || [];
+    // Wenn für diese Woche in DB geladen: nimm diese
+    if (weekly !== undefined && weekly !== null) {
+      return weekly;
+    }
     
-    // Manuell hinzugefügte (aus weeklyAssignments)
-    const manual = weekly || [];
-    
-    // Kombiniere: Duplikate entfernen mit Set
-    const combined = [...new Set([...defaults, ...manual])];
-    
-    console.log(`🎯 Kurs ${course.id}: Defaults [${defaults}] + Manual [${manual}] = Combined [${combined}]`);
-    
-    return combined;
+    // Sonst: Defaults (first-time Anzeige)
+    return course.assignedTrainerIds || [];
   };
 
   // Sortiere Trainer nach Verfügbarkeit und Nachname
@@ -96,7 +91,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     loadWeekStatus();
   }, [weekNumber, year]);
 
-  // Weekly Assignments vom Server laden - mit Batch-Loading
+  // v2.3.4: Weekly Assignments für ALLE sichtbaren Kurse laden
   useEffect(() => {
     const loadWeeklyAssignments = async () => {
       const weekNum = getWeekNumber(currentWeek);
@@ -117,7 +112,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           });
           
           setWeeklyAssignments(formattedAssignments);
-          console.log(`📥 Weekly Assignments geladen:`, formattedAssignments);
+          console.log(`📥 Weekly Assignments geladen für KW ${weekNum}/${year}`);
         }
       } catch (error) {
         console.error('Error loading weekly assignments:', error);
@@ -129,13 +124,13 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   }, [selectedWeek, courses.length]);
 
-  // v2.3.3 FIX: Auto-Save für Weekly Assignments - NUR MANUELLE speichern
+  // v2.3.4: Auto-Save - speichere alle Änderungen sofort
   useEffect(() => {
     const saveWeeklyAssignments = async () => {
       const weekNum = getWeekNumber(currentWeek);
       const year = currentWeek.getFullYear();
       
-      // WICHTIG: Sammle nur die Zuweisungen der AKTUELLEN Woche
+      // Sammle nur die Zuweisungen der AKTUELLEN Woche die sich geändert haben
       const currentWeekAssignments = {};
       courses.forEach(course => {
         const key = `${course.id}-${weekNum}-${year}`;
@@ -147,9 +142,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
       if (Object.keys(currentWeekAssignments).length === 0) return;
       
       try {
-        // Speichere JEDEN Kurs einzeln, nicht als Batch für die ganze Woche
         for (const [courseId, trainerIds] of Object.entries(currentWeekAssignments)) {
-          console.log(`📤 Speichere Kurs ${courseId}: [${trainerIds.join(', ')}] (NUR MANUELLE!)`);
+          console.log(`📤 Speichere Kurs ${courseId} KW ${weekNum}/${year}: [${trainerIds.join(', ')}]`);
           
           await fetch(`${API_URL}/weekly-assignments`, {
             method: 'POST',
@@ -430,7 +424,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return `${firstName} ${lastName}`;
   };
 
-  // v2.3.3: Trainer hinzufügen (NUR zu weeklyAssignments, nicht zu Defaults)
+  // v2.3.4: Trainer hinzufügen
   const addTrainerToCourse = (courseId, trainerId) => {
     if (!trainerId) return;
     
@@ -442,7 +436,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     const key = `${courseId}-${weekNum}-${year}`;
     
     setWeeklyAssignments(prev => {
-      const currentAssignments = prev[key] || [];
+      const currentAssignments = prev[key] || getWeeklyTrainers(course) || [];
       
       if (currentAssignments.includes(parseInt(trainerId))) {
         return prev;
@@ -457,7 +451,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
-  // v2.3.3 FIX: Trainer entfernen - NUR aus weeklyAssignments, NICHT aus Defaults!
+  // v2.3.4: Trainer entfernen - ALLE können gelöscht werden
   const removeTrainerFromCourse = (courseId, trainerId) => {
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
@@ -466,20 +460,10 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     const year = selectedWeek.getFullYear();
     const key = `${courseId}-${weekNum}-${year}`;
     
-    // Prüfe: Ist dieser Trainer ein Default-Trainer?
-    const defaults = course.assignedTrainerIds || [];
-    const isDefault = defaults.includes(parseInt(trainerId));
-    
-    if (isDefault) {
-      // Kann Default-Trainer nicht einzeln löschen
-      alert(`${getTrainerName(trainerId)} ist ein Standard-Trainer dieses Kurses und kann nicht einzeln entfernt werden. Bitte bearbeite die Kurszuordnungen in der Kursverwaltung.`);
-      return;
-    }
-    
     console.log(`❌ Trainer ${trainerId} aus Kurs ${courseId} entfernt`);
     
     setWeeklyAssignments(prev => {
-      const currentAssignments = prev[key] || [];
+      const currentAssignments = prev[key] || getWeeklyTrainers(course) || [];
       const trainerIdInt = parseInt(trainerId);
       const filtered = currentAssignments.filter(id => id !== trainerIdInt);
       
@@ -499,12 +483,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     if (assigned < required) return { status: 'warning', color: 'yellow', message: `${required - assigned} fehlt` };
     if (assigned === required) return { status: 'optimal', color: 'green', message: '' };
     return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
-  };
-
-  // v2.3.3: Bestimme ob Trainer ein Default oder Manuell ist
-  const isDefaultTrainer = (course, trainerId) => {
-    const defaults = course.assignedTrainerIds || [];
-    return defaults.includes(trainerId);
   };
 
   // RENDER
@@ -650,23 +628,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                       return weeklyTrainerIds.length > 0 && (
                         <div className="mt-3 ml-8">
                           <div className="flex flex-wrap gap-1 sm:gap-2">
-                            {weeklyTrainerIds.map(trainerId => {
-                              const isDefault = isDefaultTrainer(course, trainerId);
-                              return (
-                                <span 
-                                  key={trainerId} 
-                                  className={`inline-flex items-center px-2 py-1 rounded text-xs sm:text-sm ${
-                                    isDefault 
-                                      ? 'bg-blue-50 border border-blue-200' 
-                                      : 'bg-white border border-gray-200'
-                                  }`}
-                                >
-                                  <UserCheck className="w-3 h-3 mr-1 text-green-600" />
-                                  {getTrainerName(trainerId)}
-                                  {isDefault && <span className="ml-1 text-xs text-blue-600">(Standard)</span>}
-                                </span>
-                              );
-                            })}
+                            {weeklyTrainerIds.map(trainerId => (
+                              <span key={trainerId} className="inline-flex items-center px-2 py-1 bg-white rounded text-xs sm:text-sm border border-gray-200">
+                                <UserCheck className="w-3 h-3 mr-1 text-green-600" />
+                                {getTrainerName(trainerId)}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       );
@@ -677,7 +644,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="sm:ml-9">
-                      <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer zuweisen:</h4>
+                      <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer verwalten:</h4>
                       
                       {(() => {
                         const weeklyTrainerIds = getWeeklyTrainers(course);
@@ -690,33 +657,23 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                               if (!trainer) return null;
                               
                               const isAvailable = trainer.availability?.includes(courseDayOfWeek);
-                              const isDefault = isDefaultTrainer(course, trainerId);
                               
                               return (
-                                <div key={trainerId} className={`flex items-center justify-between rounded px-3 py-2 ${
-                                  isDefault 
-                                    ? 'bg-blue-50 border border-blue-200' 
-                                    : 'bg-green-50 border border-green-200'
-                                }`}>
+                                <div key={trainerId} className="flex items-center justify-between bg-green-50 border border-green-200 rounded px-3 py-2">
                                   <div className="flex items-center gap-2">
-                                    <UserCheck className={`w-4 h-4 ${isDefault ? 'text-blue-600' : 'text-green-600'}`} />
+                                    <UserCheck className="w-4 h-4 text-green-600" />
                                     <span className="font-medium text-sm">{getTrainerName(trainerId)}</span>
-                                    {isDefault && (
-                                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">Standard</span>
-                                    )}
                                     {isAvailable && (
                                       <span className="text-xs text-green-600">✓ Verfügbar</span>
                                     )}
                                   </div>
-                                  {!isDefault && (
-                                    <button
-                                      onClick={() => removeTrainerFromCourse(course.id, trainerId)}
-                                      className="text-red-500 hover:text-red-700"
-                                      title="Entfernen"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => removeTrainerFromCourse(course.id, trainerId)}
+                                    className="text-red-500 hover:text-red-700"
+                                    title="Entfernen"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
                                 </div>
                               );
                             })}
@@ -812,10 +769,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-100 border border-blue-300 rounded"></div>
             <span>Überbesetzt</span>
           </div>
-        </div>
-        <div className="mt-3 text-xs text-gray-600">
-          <p><span className="font-medium">Blau (Standard):</span> Standard-Trainer aus Kurszuordnung (nicht einzeln löschbar)</p>
-          <p><span className="font-medium">Grün:</span> Manuell hinzugefügt für diese Woche (einzeln löschbar)</p>
         </div>
       </div>
     </div>
