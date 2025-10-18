@@ -79,14 +79,14 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       const monthResponse = await fetch(`${API_URL}/trainer-hours/${currentYear}/${currentMonth}`);
       if (monthResponse.ok) {
         const monthData = await monthResponse.json();
-        // Merge mit Jahresstunden
+        // Merge mit Jahresstunden - monthlyHours NICHT totalHours überschreiben!
         setTrainerStats(prev => {
           const merged = { ...prev };
           Object.keys(monthData).forEach(trainerId => {
             if (merged[trainerId]) {
               merged[trainerId] = {
                 ...merged[trainerId],
-                ...monthData[trainerId]
+                monthlyHours: monthData[trainerId].totalHours  // NUR als monthlyHours speichern!
               };
             }
           });
