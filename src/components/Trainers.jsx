@@ -72,6 +72,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       const yearResponse = await fetch(`${API_URL}/trainer-hours/${currentYear}`);
       if (yearResponse.ok) {
         const yearData = await yearResponse.json();
+        console.log('📊 yearData keys:', Object.keys(yearData).slice(0, 5), 'Sample:', yearData['1']);
         setTrainerStats(yearData);
       }
       
@@ -79,6 +80,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       const monthResponse = await fetch(`${API_URL}/trainer-hours/${currentYear}/${currentMonth}`);
       if (monthResponse.ok) {
         const monthData = await monthResponse.json();
+        console.log('📊 monthData keys:', Object.keys(monthData).slice(0, 5), 'Sample:', monthData['1']);
         // Merge mit Jahresstunden - monthlyHours NICHT totalHours überschreiben!
         setTrainerStats(prev => {
           const merged = { ...prev };
@@ -88,8 +90,11 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                 ...merged[trainerId],
                 monthlyHours: monthData[trainerId].totalHours  // NUR als monthlyHours speichern!
               };
+            } else {
+              console.warn(`⚠️ Trainer ${trainerId} nicht in yearData gefunden!`);
             }
           });
+          console.log('📊 merged[1] nach merge:', merged['1']);
           return merged;
         });
       }
