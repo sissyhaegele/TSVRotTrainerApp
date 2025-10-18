@@ -121,7 +121,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   }, [selectedWeek, courses.length]);
 
-  // FIX v2.3.1: Auto-Save für Weekly Assignments - NUR aktuelle Woche speichern!
+  // v2.3.2 FIX: Auto-Save für Weekly Assignments - RACE CONDITION FIX
+  // Nur weeklyAssignments als dependency, nicht currentWeek!
   useEffect(() => {
     const saveWeeklyAssignments = async () => {
       const weekNum = getWeekNumber(currentWeek);
@@ -141,6 +142,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
       try {
         // Speichere JEDEN Kurs einzeln, nicht als Batch für die ganze Woche
         for (const [courseId, trainerIds] of Object.entries(currentWeekAssignments)) {
+          console.log(`📤 Speichere Kurs ${courseId}: [${trainerIds.join(', ')}]`);
+          
           await fetch(`${API_URL}/weekly-assignments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -166,7 +169,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }, 2000);
     
     return () => clearTimeout(timeoutId);
-  }, [weeklyAssignments, courses, currentWeek]);
+  }, [weeklyAssignments]); // v2.3.2: RACE CONDITION FIX - entfernt currentWeek und courses
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
@@ -445,7 +448,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
-  // Trainer entfernen - FIX v2.3.1: Korrekt nur einen entfernen
+  // v2.3.2 FIX: Trainer entfernen - Korrekt nur einen entfernen
   const removeTrainerFromCourse = (courseId, trainerId) => {
     const course = courses.find(c => c.id === courseId);
     if (!course) return;
@@ -454,9 +457,23 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     const year = selectedWeek.getFullYear();
     const key = `${courseId}-${weekNum}-${year}`;
     
+    console.log(`❌ Entferne Trainer ${trainerId} aus Kurs ${courseId}`);
+    console.log(`🔍 Aktueller State vor Update:`, weeklyAssignments[key]);
+    
     setWeeklyAssignments(prev => {
       const currentAssignments = prev[key] || [];
-      const filtered = currentAssignments.filter(id => id !== parseInt(trainerId));
+      const trainerIdInt = parseInt(trainerId);
+      
+      console.log(`📋 Array vor Filter: [${currentAssignments.join(', ')}]`);
+      console.log(`🎯 Suche Trainer: ${trainerIdInt} (typeof: ${typeof trainerIdInt})`);
+      
+      const filtered = currentAssignments.filter(id => {
+        const keep = id !== trainerIdInt;
+        console.log(`  - ID ${id} (${typeof id}): ${keep ? 'BEHALTEN' : 'GELÖSCHT'}`);
+        return keep;
+      });
+      
+      console.log(`📋 Array nach Filter: [${filtered.join(', ')}]`);
       
       return {
         ...prev,
