@@ -272,6 +272,7 @@ function App() {
                 setTrainers={setTrainers}
                 deleteMode={deleteMode}
                 adminMode={adminMode}
+                courses={courses}
               />
             )}
           </div>
