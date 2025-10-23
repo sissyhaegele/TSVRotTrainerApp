@@ -20,7 +20,7 @@ const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8181/api'
   : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
 
-export default function Trainers({ trainers, setTrainers, deleteMode, adminMode }) {
+export default function Trainers({ trainers, setTrainers, deleteMode, adminMode, courses = [] }) {
   const [editingTrainer, setEditingTrainer] = useState(null);
   const [newTrainer, setNewTrainer] = useState({
     firstName: '',
@@ -86,6 +86,13 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
       loadTrainerHours();
     }
   }, [trainers.length]);
+
+  // ✅ NEU: Berechne Anzahl der Kurse pro Trainer
+  const getTrainerCourseCount = (trainerId) => {
+    return courses.filter(course => 
+      course.assignedTrainerIds?.includes(trainerId)
+    ).length;
+  };
 
   const loadTrainers = async () => {
     try {
@@ -535,7 +542,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                        3
+                        {getTrainerCourseCount(trainer.id)}
                       </div>
                       <div className="text-xs text-gray-600 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />
