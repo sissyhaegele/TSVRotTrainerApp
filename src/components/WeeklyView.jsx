@@ -336,6 +336,51 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return courseDate;
   };
 
+  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
+const getGroupedActivities = () => {
+  const grouped = weekActivities.reduce((acc, activity) => {
+    const key = `${activity.date}_${activity.title}`;
+    if (!acc[key]) {
+      acc[key] = {
+        ...activity,
+        trainers: []
+      };
+    }
+    acc[key].trainers.push({
+      id: activity.trainer_id,
+      hours: activity.hours
+    });
+    return acc;
+  }, {});
+  return Object.values(grouped);
+};
+
+// v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
+const getActivitiesForDay = (dayOfWeek) => {
+  const dayIndex = daysOfWeek.indexOf(dayOfWeek);
+  if (dayIndex === -1) return [];
+  
+  const groupedActivities = getGroupedActivities();
+  
+  return groupedActivities.filter(activity => {
+    const activityDate = new Date(activity.date);
+    const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
+    return activityDayIndex === dayIndex;
+  });
+};
+
+// v2.4.2: Hole Aktivitäts-Typ Label
+const getActivityTypeLabel = (type, customType) => {
+  const types = {
+    'ferienspass': 'Ferienspaß',
+    'vereinsfest': 'Vereinsfest',
+    'workshop': 'Workshop',
+    'fortbildung': 'Fortbildung',
+    'sonstiges': customType || 'Sonstiges'
+  };
+  return types[type] || type;
+};
+
   const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -464,51 +509,6 @@ const filteredCourses = React.useMemo(() => {
     const firstName = trainer.firstName || trainer.first_name || '';
     const lastName = trainer.lastName || trainer.last_name || '';
     return `${firstName} ${lastName}`;
-  };
-
-  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
-  const getGroupedActivities = () => {
-    const grouped = weekActivities.reduce((acc, activity) => {
-      const key = `${activity.date}_${activity.title}`;
-      if (!acc[key]) {
-        acc[key] = {
-          ...activity,
-          trainers: []
-        };
-      }
-      acc[key].trainers.push({
-        id: activity.trainer_id,
-        hours: activity.hours
-      });
-      return acc;
-    }, {});
-    return Object.values(grouped);
-  };
-
-  // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
-  const getActivitiesForDay = (dayOfWeek) => {
-    const dayIndex = daysOfWeek.indexOf(dayOfWeek);
-    if (dayIndex === -1) return [];
-    
-    const groupedActivities = getGroupedActivities();
-    
-    return groupedActivities.filter(activity => {
-      const activityDate = new Date(activity.date);
-      const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
-      return activityDayIndex === dayIndex;
-    });
-  };
-
-  // v2.4.2: Hole Aktivitäts-Typ Label
-  const getActivityTypeLabel = (type, customType) => {
-    const types = {
-      'ferienspass': 'Ferienspaß',
-      'vereinsfest': 'Vereinsfest',
-      'workshop': 'Workshop',
-      'fortbildung': 'Fortbildung',
-      'sonstiges': customType || 'Sonstiges'
-    };
-    return types[type] || type;
   };
 
   // v2.3.4: Trainer hinzufügen
@@ -904,13 +904,13 @@ const filteredCourses = React.useMemo(() => {
                   </div>
                 </div>
               </div>
-            </div>
+    </div>
           );
         })}
       </div>
     );
-  })();
-})}
+  });
+})()}
 </div>
 
       {filteredCourses.length === 0 && weekActivities.length === 0 && (
