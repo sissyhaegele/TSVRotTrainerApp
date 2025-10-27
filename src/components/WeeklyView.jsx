@@ -424,23 +424,28 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   };
 
-  // Filter und Sortierung
-  const filteredCourses = React.useMemo(() => {
-    let filtered = [...courses];
-    
-    if (selectedDay !== 'Alle') {
-      filtered = filtered.filter(c => (c.dayOfWeek || c.day_of_week) === selectedDay);
-    }
-    
-    const dayOrder = { 'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7 };
-    filtered.sort((a, b) => {
-      const dayDiff = dayOrder[a.dayOfWeek] - dayOrder[b.dayOfWeek];
-      if (dayDiff !== 0) return dayDiff;
-      return (a.startTime || '').localeCompare(b.startTime || '');
-    });
-    
-    return filtered;
-  }, [courses, selectedDay]);
+ // Filter und Sortierung
+const filteredCourses = React.useMemo(() => {
+  let filtered = [...courses];
+  
+  if (selectedDay !== 'Alle') {
+    filtered = filtered.filter(c => (c.dayOfWeek || c.day_of_week) === selectedDay);
+  }
+  
+  const dayOrder = { 'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7 };
+  filtered.sort((a, b) => {
+    // FIX: Unterstütze beide Feldnamen
+    const aDayOfWeek = a.dayOfWeek || a.day_of_week;
+    const bDayOfWeek = b.dayOfWeek || b.day_of_week;
+    const dayDiff = dayOrder[aDayOfWeek] - dayOrder[bDayOfWeek];
+    if (dayDiff !== 0) return dayDiff;
+    // FIX: Unterstütze beide Feldnamen für startTime
+    return (a.startTime || a.start_time || '').localeCompare(b.startTime || b.start_time || '');
+  });
+  
+  return filtered;
+}, [courses, selectedDay]);
+
 
   // UI-Funktionen
   const toggleCourseExpansion = (courseId) => {
