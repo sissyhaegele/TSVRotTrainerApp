@@ -429,7 +429,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     let filtered = [...courses];
     
     if (selectedDay !== 'Alle') {
-      filtered = filtered.filter(c => c.dayOfWeek === selectedDay);
+      filtered = filtered.filter(c => (c.dayOfWeek || c.day_of_week) === selectedDay);
     }
     
     const dayOrder = { 'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7 };
