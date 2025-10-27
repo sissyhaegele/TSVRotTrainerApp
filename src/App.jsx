@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, X, Menu, LogOut } from 'lucide-react';
+import { Calendar, Users, X, Menu, LogOut, Sparkles } from 'lucide-react';
 import WeeklyView from './components/WeeklyView';
 import Courses from './components/Courses';
 import Trainers from './components/Trainers';
+import Activities from './components/Activities';
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
@@ -206,6 +207,18 @@ function App() {
               <Users className="mr-3 h-5 w-5" />
               Trainer
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('activities');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'activities' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Sparkles className="mr-3 h-5 w-5" />
+              Aktivitäten
+            </button>
           </nav>
           
           {adminMode && (
@@ -273,6 +286,13 @@ function App() {
                 deleteMode={deleteMode}
                 adminMode={adminMode}
                 courses={courses}
+              />
+            )}
+            {activeTab === 'activities' && (
+              <Activities 
+                trainers={trainers}
+                deleteMode={deleteMode}
+                adminMode={adminMode}
               />
             )}
           </div>
