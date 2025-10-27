@@ -527,40 +527,40 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   };
 
 const toggleHolidayWeek = async () => {
-  const key = `${weekNumber}-${year}`;
+    const key = `${weekNumber}-${year}`;
 
-      try {
-        if (holidayWeeks.has(key)) {
-          const response = await fetch(`${API_URL}/holiday-weeks?week_number=${weekNumber}&year=${year}`, {
-            method: 'DELETE'
-          });
+    try {
+      if (holidayWeeks.has(key)) {
+        const response = await fetch(`${API_URL}/holiday-weeks?week_number=${weekNumber}&year=${year}`, {
+          method: 'DELETE'
+        });
 
-          if (response.ok) {
-            const newHolidays = new Set(holidayWeeks);
-            newHolidays.delete(key);
-            setHolidayWeeks(newHolidays);
-          }
-        } else {
-          const response = await fetch(`${API_URL}/holiday-weeks`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              week_number: weekNumber,
-              year: year
-            })
-          });
-
-          if (response.ok) {
-            const newHolidays = new Set(holidayWeeks);
-            newHolidays.add(key);
-            setHolidayWeeks(newHolidays);
-          }
+        if (response.ok) {
+          const newHolidays = new Set(holidayWeeks);
+          newHolidays.delete(key);
+          setHolidayWeeks(newHolidays);
         }
-      } catch (error) {
-        console.error('Fehler beim Speichern der Ferienwoche:', error);
-        alert('Fehler beim Speichern der Ferienwoche');
+      } else {
+        const response = await fetch(`${API_URL}/holiday-weeks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            week_number: weekNumber,
+            year: year
+          })
+        });
+
+        if (response.ok) {
+          const newHolidays = new Set(holidayWeeks);
+          newHolidays.add(key);
+          setHolidayWeeks(newHolidays);
+        }
       }
-    };
+    } catch (error) {
+      console.error('Fehler beim Speichern der Ferienwoche:', error);
+      alert('Fehler beim Speichern der Ferienwoche');
+    }
+  };
 
     // Filter und Sortierung
     const filteredCourses = React.useMemo(() => {
@@ -1064,7 +1064,6 @@ const toggleHolidayWeek = async () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 
