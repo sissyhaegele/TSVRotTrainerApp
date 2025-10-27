@@ -706,7 +706,7 @@ const filteredCourses = React.useMemo(() => {
                       </button>
                       <div className="flex-1">
                         <div className="font-bold text-gray-900 text-sm sm:text-base">
-                          {course.dayOfWeek || course.day_of_week}, {formatDate(getDateForCourse(course.dayOfWeek || course.day_of_week))} · {course.startTime || course.start_time || '?'}
+                        {course.startTime || course.start_time || '?'}
                         </div>
                         <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
                           {course.name}
