@@ -626,28 +626,49 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         </select>
       </div>
 
-      {/* Kursliste */}
-      <div className="space-y-3">
-        {filteredCourses.map(course => {
-          const isExpanded = expandedCourses.has(course.id);
-          const status = getStaffingStatus(course);
-          const bgColor = isCourseCancel(course.id) 
-            ? 'bg-gray-100 border-gray-400 opacity-60' 
-            : status.color === 'red' ? 'bg-red-50 border-red-300' :
-              status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
-              status.color === 'green' ? 'bg-green-50 border-green-300' :
-              'bg-blue-50 border-blue-300';
+      {/* Kursliste - v2.4.2: Gruppiert nach Tagen */}
+      <div className="space-y-6">
+        {(() => {
+          // Welche Tage sollen angezeigt werden?
+          const daysToShow = selectedDay === 'Alle' ? daysOfWeek : [selectedDay];
           
-          // Prüfe ob dies der letzte Kurs dieses Tages ist
-          const day = course.dayOfWeek || course.day_of_week;
-          const isLastCourseOfDay = filteredCourses.filter(c => 
-            (c.dayOfWeek || c.day_of_week) === day
-          ).pop()?.id === course.id;
-          const dayActivities = isLastCourseOfDay ? getActivitiesForDay(day) : [];
+          return daysToShow.map(day => {
+            // Kurse für diesen Tag
+            const dayCourses = filteredCourses.filter(course => 
+              (course.dayOfWeek || course.day_of_week) === day
+            );
+            
+            // Aktivitäten für diesen Tag
+            const dayActivities = getActivitiesForDay(day);
+            
+            // Wenn weder Kurse noch Aktivitäten: Tag überspringen
+            if (dayCourses.length === 0 && dayActivities.length === 0) {
+              return null;
+            }
+            
+            return (
+              <div key={day} className="space-y-3">
+                {/* Tages-Header */}
+                <div className="bg-red-100 border-l-4 border-red-600 p-3 rounded">
+                  <h3 className="font-bold text-red-900 flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    {day}, {formatDate(getDateForCourse(day))}
+                  </h3>
+                </div>
+                
+                {/* Kurse */}
+                {dayCourses.map(course => {
+                  const isExpanded = expandedCourses.has(course.id);
+                  const status = getStaffingStatus(course);
+                  const bgColor = isCourseCancel(course.id) 
+                    ? 'bg-gray-100 border-gray-400 opacity-60' 
+                    : status.color === 'red' ? 'bg-red-50 border-red-300' :
+                      status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
+                      status.color === 'green' ? 'bg-green-50 border-green-300' :
+                      'bg-blue-50 border-blue-300';
 
-          return (
-            <React.Fragment key={course.id}>
-              <div className={`border-2 rounded-lg ${bgColor}`}>
+                  return (
+                    <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
               <div className="p-3 sm:p-4">
                 {isCourseCancel(course.id) && (
                   <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2">
@@ -830,54 +851,57 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 )}
               </div>
             </div>
-            
-            {/* v2.4.2: Aktivitäten für diesen Tag (nach dem letzten Kurs) */}
-            {dayActivities.length > 0 && dayActivities.map((activity, actIdx) => {
-              const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
-              const trainerCount = activity.trainers.length;
-              const trainerNames = activity.trainers
-                .map(t => getTrainerName(t.id))
-                .filter(name => name !== 'Unbekannter Trainer')
-                .join(', ');
-              
-              return (
-                <div 
-                  key={`activity-${activity.id}-${actIdx}`} 
-                  className="border-2 border-green-400 rounded-lg bg-green-50"
-                >
-                  <div className="p-3 sm:p-4">
-                    <div className="flex items-start gap-2 sm:gap-3">
-                      <div className="mt-1 p-1 bg-green-200 rounded-full">
-                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
-                            {activityTypeLabel}
-                          </span>
-                        </div>
-                        <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
-                          {activity.hours}h · {activity.title}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
-                          <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                          <span className="font-medium">{trainerCount} Trainer:</span>
-                          <span className="text-gray-600">{trainerNames}</span>
-                        </div>
-                      </div>
+          );
+        })}
+        
+        {/* Aktivitäten für diesen Tag */}
+        {dayActivities.map((activity, actIdx) => {
+          const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
+          const trainerCount = activity.trainers.length;
+          const trainerNames = activity.trainers
+            .map(t => getTrainerName(t.id))
+            .filter(name => name !== 'Unbekannter Trainer')
+            .join(', ');
+          
+          return (
+            <div 
+              key={`activity-${activity.id}-${actIdx}`} 
+              className="border-2 border-green-400 rounded-lg bg-green-50"
+            >
+              <div className="p-3 sm:p-4">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="mt-1 p-1 bg-green-200 rounded-full">
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
+                        {activityTypeLabel}
+                      </span>
+                    </div>
+                    <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
+                      {activity.hours}h · {activity.title}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
+                      <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span className="font-medium">{trainerCount} Trainer:</span>
+                      <span className="text-gray-600">{trainerNames}</span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </React.Fragment>
+              </div>
+            </div>
           );
         })}
       </div>
+    );
+  })();
+})}
+</div>
 
-      {filteredCourses.length === 0 && (
+      {filteredCourses.length === 0 && weekActivities.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
-          Keine Kurse für {selectedDay === 'Alle' ? 'diese Auswahl' : selectedDay} vorhanden.
+          Keine Kurse oder Aktivitäten für {selectedDay === 'Alle' ? 'diese Woche' : selectedDay} vorhanden.
         </div>
       )}
 
