@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X } from 'lucide-react';
+import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X, Sparkles } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
@@ -20,6 +20,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // v2.2.0: State für Stundenerfassung
   const [weekStatus, setWeekStatus] = useState({});
   const [finalizingWeek, setFinalizingWeek] = useState(false);
+
+  // v2.4.2: Außerplanmäßige Aktivitäten der Woche
+  const [weekActivities, setWeekActivities] = useState([]);
 
   // KW berechnen
   const getWeekNumber = (date) => {
@@ -69,6 +72,60 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // Prüfe ob es eine Ferienwoche ist
   const isHolidayWeek = () => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
+  };
+
+  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
+  const getGroupedActivities = () => {
+    const grouped = weekActivities.reduce((acc, activity) => {
+      const key = `${activity.date}_${activity.title}`;
+      if (!acc[key]) {
+        acc[key] = {
+          ...activity,
+          trainers: []
+        };
+      }
+      acc[key].trainers.push({
+        id: activity.trainer_id,
+        hours: activity.hours
+      });
+      return acc;
+    }, {});
+    return Object.values(grouped);
+  };
+
+  // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
+  const getActivitiesForDay = (dayOfWeek) => {
+    const dayIndex = daysOfWeek.indexOf(dayOfWeek);
+    if (dayIndex === -1) return [];
+    
+    const groupedActivities = getGroupedActivities();
+    
+    return groupedActivities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
+      return activityDayIndex === dayIndex;
+    });
+  };
+
+  // v2.4.2: Hole Aktivitäts-Typ Label
+  const getActivityTypeLabel = (type, customType) => {
+    const types = {
+      'ferienspass': 'Ferienspaß',
+      'vereinsfest': 'Vereinsfest',
+      'workshop': 'Workshop',
+      'fortbildung': 'Fortbildung',
+      'sonstiges': customType || 'Sonstiges'
+    };
+    return types[type] || type;
+  };
+
+  // v2.4.2: Hole Trainer-Name
+  const getTrainerName = (trainerId) => {
+    const trainer = trainers.find(t => t.id === trainerId);
+    if (!trainer) return 'Unbekannt';
+    const firstName = trainer.firstName || trainer.first_name || '';
+    const lastName = trainer.lastName || trainer.last_name || '';
+    return `${firstName} ${lastName}`.trim();
   };
 
   // Lade Woche-Status beim Mount und bei Wechsel
@@ -233,6 +290,23 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     };
     
     loadHolidayWeeks();
+  }, [weekNumber, year]);
+
+  // v2.4.2: Lade Aktivitäten der aktuellen Woche
+  useEffect(() => {
+    const loadWeekActivities = async () => {
+      try {
+        const response = await fetch(`${API_URL}/special-activities/week/${weekNumber}/${year}`);
+        if (response.ok) {
+          const data = await response.json();
+          setWeekActivities(data);
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Wochen-Aktivitäten:', error);
+      }
+    };
+    
+    loadWeekActivities();
   }, [weekNumber, year]);
 
   // Hilfsfunktionen
@@ -563,18 +637,43 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
       {/* Kursliste */}
       <div className="space-y-3">
-        {filteredCourses.map(course => {
-          const isExpanded = expandedCourses.has(course.id);
-          const status = getStaffingStatus(course);
-          const bgColor = isCourseCancel(course.id) 
-            ? 'bg-gray-100 border-gray-400 opacity-60' 
-            : status.color === 'red' ? 'bg-red-50 border-red-300' :
-              status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
-              status.color === 'green' ? 'bg-green-50 border-green-300' :
-              'bg-blue-50 border-blue-300';
+        {(() => {
+          // Gruppiere Kurse nach Tagen
+          const coursesAndActivitiesByDay = {};
+          
+          filteredCourses.forEach(course => {
+            const day = course.dayOfWeek || course.day_of_week;
+            if (!coursesAndActivitiesByDay[day]) {
+              coursesAndActivitiesByDay[day] = { courses: [], activities: [] };
+            }
+            coursesAndActivitiesByDay[day].courses.push(course);
+          });
+          
+          // Füge Aktivitäten hinzu
+          Object.keys(coursesAndActivitiesByDay).forEach(day => {
+            coursesAndActivitiesByDay[day].activities = getActivitiesForDay(day);
+          });
+          
+          // Rendere alle Kurse
+          return filteredCourses.map(course => {
+            const isExpanded = expandedCourses.has(course.id);
+            const status = getStaffingStatus(course);
+            const bgColor = isCourseCancel(course.id) 
+              ? 'bg-gray-100 border-gray-400 opacity-60' 
+              : status.color === 'red' ? 'bg-red-50 border-red-300' :
+                status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
+                status.color === 'green' ? 'bg-green-50 border-green-300' :
+                'bg-blue-50 border-blue-300';
+            
+            const day = course.dayOfWeek || course.day_of_week;
+            const isLastCourseOfDay = filteredCourses.filter(c => 
+              (c.dayOfWeek || c.day_of_week) === day
+            ).pop()?.id === course.id;
+            const dayActivities = isLastCourseOfDay ? getActivitiesForDay(day) : [];
 
-          return (
-            <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
+            return (
+              <React.Fragment key={course.id}>
+                <div className={`border-2 rounded-lg ${bgColor}`}>
               <div className="p-3 sm:p-4">
                 {isCourseCancel(course.id) && (
                   <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2">
@@ -757,7 +856,49 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 )}
               </div>
             </div>
+            
+            {/* v2.4.2: Aktivitäten für diesen Tag (nach dem letzten Kurs des Tages) */}
+            {dayActivities.length > 0 && dayActivities.map((activity, actIdx) => {
+              const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
+              const trainerCount = activity.trainers.length;
+              const trainerNames = activity.trainers
+                .map(t => getTrainerName(t.id))
+                .filter(name => name !== 'Unbekannt')
+                .join(', ');
+              
+              return (
+                <div 
+                  key={`activity-${activity.id}-${actIdx}`} 
+                  className="border-2 border-green-400 rounded-lg bg-green-50"
+                >
+                  <div className="p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <div className="mt-1 p-1 bg-green-200 rounded-full">
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
+                            {activityTypeLabel}
+                          </span>
+                        </div>
+                        <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
+                          {activity.hours}h · {activity.title}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
+                          <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="font-medium">{trainerCount} Trainer:</span>
+                          <span className="text-gray-600">{trainerNames}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </React.Fragment>
           );
+        })();
         })}
       </div>
 
