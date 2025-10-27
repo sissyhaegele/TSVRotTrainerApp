@@ -662,10 +662,12 @@ const filteredCourses = React.useMemo(() => {
               <div className="border-b-2 border-red-600 pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-red-600" />
-                <h3 className="font-bold text-gray-900 text-xl">{day}</h3>
-                <span className="text-gray-500 text-sm ml-auto">{formatDate(getDateForCourse(day))}</span>
+                  <div>
+                  <h3 className="font-bold text-gray-900 text-xl">{day}</h3>
+                  <span className="text-gray-500 text-sm">{formatDate(getDateForCourse(day))}</span>
+                  </div>
+                </div>
               </div>
-            </div>
                 
                 {/* Kurse */}
                 {dayCourses.map(course => {
