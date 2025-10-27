@@ -6,7 +6,9 @@ import {
   Trash2,
   Clock,
   FileText,
-  Tag
+  Tag,
+  Edit2,
+  X
 } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost' 
@@ -22,8 +24,11 @@ export default function Activities({
   const [error, setError] = useState(null);
   const [activities, setActivities] = useState([]);
   const [selectedTrainers, setSelectedTrainers] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingActivityId, setEditingActivityId] = useState(null);
   
-  const [newActivity, setNewActivity] = useState({
+  const [activityForm, setActivityForm] = useState({
     date: new Date().toISOString().split('T')[0],
     activityType: '',
     customType: '',
@@ -40,7 +45,6 @@ export default function Activities({
     { value: 'sonstiges', label: 'Sonstiges' }
   ];
 
-  // Lade Aktivitäten beim Start
   useEffect(() => {
     loadActivities();
   }, []);
@@ -69,25 +73,69 @@ export default function Activities({
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   };
 
-  const addActivity = async () => {
+  const resetForm = () => {
+    setActivityForm({
+      date: new Date().toISOString().split('T')[0],
+      activityType: '',
+      customType: '',
+      title: '',
+      hours: '',
+      notes: ''
+    });
+    setSelectedTrainers([]);
+    setEditMode(false);
+    setEditingActivityId(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setShowModal(true);
+  };
+
+  const openEditModal = (activity) => {
+    // Finde alle Trainer-IDs für diese Aktivität
+    const activityTrainers = activities
+      .filter(a => a.date === activity.date && a.title === activity.title)
+      .map(a => a.trainer_id);
+
+    setActivityForm({
+      date: activity.date.split('T')[0],
+      activityType: activity.activity_type,
+      customType: activity.custom_type || '',
+      title: activity.title,
+      hours: activity.hours.toString(),
+      notes: activity.notes || ''
+    });
+    setSelectedTrainers(activityTrainers);
+    setEditMode(true);
+    setEditingActivityId(activity.id);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    resetForm();
+  };
+
+  const saveActivity = async () => {
     // Validierung
-    if (!newActivity.date) {
+    if (!activityForm.date) {
       setError('Bitte Datum angeben');
       return;
     }
-    if (!newActivity.activityType) {
+    if (!activityForm.activityType) {
       setError('Bitte Aktivitätstyp wählen');
       return;
     }
-    if (newActivity.activityType === 'sonstiges' && !newActivity.customType) {
+    if (activityForm.activityType === 'sonstiges' && !activityForm.customType) {
       setError('Bitte Beschreibung für "Sonstiges" angeben');
       return;
     }
-    if (!newActivity.title) {
+    if (!activityForm.title) {
       setError('Bitte Titel angeben');
       return;
     }
-    if (!newActivity.hours || parseFloat(newActivity.hours) <= 0) {
+    if (!activityForm.hours || parseFloat(activityForm.hours) <= 0) {
       setError('Bitte gültige Stundenzahl angeben');
       return;
     }
@@ -97,48 +145,50 @@ export default function Activities({
     }
 
     const activityData = {
-      date: newActivity.date,
-      weekNumber: getWeekNumber(new Date(newActivity.date)),
-      year: new Date(newActivity.date).getFullYear(),
-      activityType: newActivity.activityType,
-      customType: newActivity.activityType === 'sonstiges' ? newActivity.customType : null,
-      title: newActivity.title,
-      hours: parseFloat(newActivity.hours),
-      notes: newActivity.notes || null,
+      date: activityForm.date,
+      weekNumber: getWeekNumber(new Date(activityForm.date)),
+      year: new Date(activityForm.date).getFullYear(),
+      activityType: activityForm.activityType,
+      customType: activityForm.activityType === 'sonstiges' ? activityForm.customType : null,
+      title: activityForm.title,
+      hours: parseFloat(activityForm.hours),
+      notes: activityForm.notes || null,
       trainerIds: selectedTrainers
     };
 
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_URL}/special-activities`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(activityData)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Speichern');
+      if (editMode) {
+        const response = await fetch(`${API_URL}/special-activities/${editingActivityId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activityData)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Fehler beim Aktualisieren');
+        }
+      } else {
+        const response = await fetch(`${API_URL}/special-activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activityData)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Fehler beim Speichern');
+        }
       }
 
-      // Formular zurücksetzen
-      setNewActivity({
-        date: new Date().toISOString().split('T')[0],
-        activityType: '',
-        customType: '',
-        title: '',
-        hours: '',
-        notes: ''
-      });
-      setSelectedTrainers([]);
-      
-      // Aktivitäten neu laden
       await loadActivities();
       setError(null);
+      closeModal();
       
     } catch (err) {
-      console.error('Error adding activity:', err);
+      console.error('Error saving activity:', err);
       setError(err.message || 'Aktivität konnte nicht gespeichert werden');
     } finally {
       setLoading(false);
@@ -190,7 +240,6 @@ export default function Activities({
     return `${trainer.firstName || trainer.first_name} ${trainer.lastName || trainer.last_name}`;
   };
 
-  // Gruppiere Aktivitäten nach Datum und Titel (gleiche Aktivität = mehrere Trainer)
   const groupedActivities = activities.reduce((acc, activity) => {
     const key = `${activity.date}_${activity.title}`;
     if (!acc[key]) {
@@ -231,168 +280,193 @@ export default function Activities({
         </div>
       )}
 
-      {/* Erfassungs-Formular */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <Plus className="w-5 h-5 mr-2" />
-          Außerplanmäßige Aktivität erfassen
-        </h2>
-        
-        <div className="space-y-4">
-          {/* Zeile 1: Datum, Aktivitätstyp */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Datum *
-              </label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={newActivity.date}
-                onChange={(e) => setNewActivity({...newActivity, date: e.target.value})}
-                disabled={loading}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Aktivitätstyp *
-              </label>
-              <select
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={newActivity.activityType}
-                onChange={(e) => setNewActivity({...newActivity, activityType: e.target.value, customType: ''})}
-                disabled={loading}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Außerplanmäßige Aktivitäten</h2>
+        {adminMode && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+          >
+            <Plus size={20} />
+            Aktivität erfassen
+          </button>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editMode ? 'Aktivität bearbeiten' : 'Außerplanmäßige Aktivität erfassen'}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
               >
-                <option value="">-- Bitte wählen --</option>
-                {activityTypes.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+                <X size={24} />
+              </button>
             </div>
-          </div>
 
-          {/* Freitext bei Sonstiges */}
-          {newActivity.activityType === 'sonstiges' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Beschreibung (bei Sonstiges) *
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={newActivity.customType}
-                onChange={(e) => setNewActivity({...newActivity, customType: e.target.value})}
-                placeholder="z.B. Sommerfest Vorbereitung"
-                disabled={loading}
-              />
-            </div>
-          )}
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Datum *
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={activityForm.date}
+                    onChange={(e) => setActivityForm({...activityForm, date: e.target.value})}
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Aktivitätstyp *
+                  </label>
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={activityForm.activityType}
+                    onChange={(e) => setActivityForm({...activityForm, activityType: e.target.value, customType: ''})}
+                    disabled={loading}
+                  >
+                    <option value="">-- Bitte wählen --</option>
+                    {activityTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-          {/* Zeile 2: Titel, Stunden */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Titel / Beschreibung *
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={newActivity.title}
-                onChange={(e) => setNewActivity({...newActivity, title: e.target.value})}
-                placeholder="z.B. Ferienspaß Herbst 2025"
-                disabled={loading}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dauer in Stunden *
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={newActivity.hours}
-                onChange={(e) => setNewActivity({...newActivity, hours: e.target.value})}
-                placeholder="z.B. 4.0"
-                disabled={loading}
-              />
-            </div>
-          </div>
+              {activityForm.activityType === 'sonstiges' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Beschreibung (bei Sonstiges) *
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={activityForm.customType}
+                    onChange={(e) => setActivityForm({...activityForm, customType: e.target.value})}
+                    placeholder="z.B. Sommerfest Vorbereitung"
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
-          {/* Trainer Multi-Select */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Beteiligte Trainer * ({selectedTrainers.length} ausgewählt)
-            </label>
-            <div className="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {trainers
-                  .filter(t => t.isActive || t.is_active)
-                  .sort((a, b) => {
-                    const lastNameA = a.lastName || a.last_name || '';
-                    const lastNameB = b.lastName || b.last_name || '';
-                    return lastNameA.localeCompare(lastNameB);
-                  })
-                  .map(trainer => (
-                    <label 
-                      key={trainer.id} 
-                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedTrainers.includes(trainer.id)
-                          ? 'bg-blue-50 border border-blue-300'
-                          : 'hover:bg-gray-50 border border-transparent'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedTrainers.includes(trainer.id)}
-                        onChange={() => toggleTrainerSelection(trainer.id)}
-                        disabled={loading}
-                        className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
-                      />
-                      <span className={selectedTrainers.includes(trainer.id) ? 'font-medium' : ''}>
-                        {trainer.firstName || trainer.first_name} {trainer.lastName || trainer.last_name}
-                      </span>
-                    </label>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Titel / Beschreibung *
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={activityForm.title}
+                    onChange={(e) => setActivityForm({...activityForm, title: e.target.value})}
+                    placeholder="z.B. Ferienspaß Herbst 2025"
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dauer in Stunden *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={activityForm.hours}
+                    onChange={(e) => setActivityForm({...activityForm, hours: e.target.value})}
+                    placeholder="z.B. 4.0"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Beteiligte Trainer * ({selectedTrainers.length} ausgewählt)
+                </label>
+                <div className="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {trainers
+                      .filter(t => t.isActive || t.is_active)
+                      .sort((a, b) => {
+                        const lastNameA = a.lastName || a.last_name || '';
+                        const lastNameB = b.lastName || b.last_name || '';
+                        return lastNameA.localeCompare(lastNameB);
+                      })
+                      .map(trainer => (
+                        <label 
+                          key={trainer.id} 
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedTrainers.includes(trainer.id)
+                              ? 'bg-blue-50 border border-blue-300'
+                              : 'hover:bg-gray-50 border border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedTrainers.includes(trainer.id)}
+                            onChange={() => toggleTrainerSelection(trainer.id)}
+                            disabled={loading}
+                            className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
+                          />
+                          <span className={selectedTrainers.includes(trainer.id) ? 'font-medium' : ''}>
+                            {trainer.firstName || trainer.first_name} {trainer.lastName || trainer.last_name}
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notizen (optional)
+                </label>
+                <textarea
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={activityForm.notes}
+                  onChange={(e) => setActivityForm({...activityForm, notes: e.target.value})}
+                  placeholder="Zusätzliche Informationen..."
+                  disabled={loading}
+                />
               </div>
             </div>
-          </div>
 
-          {/* Notizen */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notizen (optional)
-            </label>
-            <textarea
-              rows={3}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={newActivity.notes}
-              onChange={(e) => setNewActivity({...newActivity, notes: e.target.value})}
-              placeholder="Zusätzliche Informationen..."
-              disabled={loading}
-            />
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+              <button
+                onClick={closeModal}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                disabled={loading}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={saveActivity}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+                disabled={loading}
+              >
+                {editMode ? 'Aktualisieren' : 'Speichern'}
+              </button>
+            </div>
           </div>
         </div>
-        
-        <button
-          onClick={addActivity}
-          disabled={loading}
-          className="mt-4 bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Aktivität speichern
-        </button>
-      </div>
+      )}
 
       {/* Liste der Aktivitäten */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Erfasste Aktivitäten</h2>
-        
         {sortedActivities.map((activity, index) => {
           const activityTypeLabel = activity.activity_type === 'sonstiges' && activity.custom_type
             ? activity.custom_type
@@ -434,14 +508,26 @@ export default function Activities({
                   </div>
                 </div>
                 
-                {adminMode && deleteMode && (
-                  <button
-                    onClick={() => deleteActivity(activity.id, activity.date)}
-                    disabled={loading}
-                    className="text-red-500 hover:text-red-700 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                {adminMode && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEditModal(activity)}
+                      className="text-blue-500 hover:text-blue-700"
+                      title="Bearbeiten"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    {deleteMode && (
+                      <button
+                        onClick={() => deleteActivity(activity.id, activity.date)}
+                        disabled={loading}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        title="Löschen"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -454,7 +540,6 @@ export default function Activities({
                 </div>
               )}
               
-              {/* Beteiligte Trainer */}
               <div>
                 <h4 className="font-medium mb-2 text-sm text-gray-700">Beteiligte Trainer:</h4>
                 <div className="flex flex-wrap gap-2">
