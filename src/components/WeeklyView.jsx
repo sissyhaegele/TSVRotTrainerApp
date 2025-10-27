@@ -636,6 +636,11 @@ const filteredCourses = React.useMemo(() => {
         {(() => {
           // Welche Tage sollen angezeigt werden?
           const daysToShow = selectedDay === 'Alle' ? daysOfWeek : [selectedDay];
+            console.log('🔍 DEBUG:', {
+            daysToShow,
+            filteredCoursesTotal: filteredCourses.length,
+            firstCourse: filteredCourses[0]
+          });
           
           return daysToShow.map(day => {
             // Kurse für diesen Tag
@@ -645,6 +650,10 @@ const filteredCourses = React.useMemo(() => {
             
             // Aktivitäten für diesen Tag
             const dayActivities = getActivitiesForDay(day);
+              console.log(`📅 ${day}:`, {
+              dayCourses: dayCourses.length,
+              dayActivities: dayActivities.length
+              });
             
             // Wenn weder Kurse noch Aktivitäten: Tag überspringen
             if (dayCourses.length === 0 && dayActivities.length === 0) {
