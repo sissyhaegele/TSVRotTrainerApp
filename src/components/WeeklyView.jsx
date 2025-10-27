@@ -1066,7 +1066,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
-  export default WeeklyView;
+export default WeeklyView;
