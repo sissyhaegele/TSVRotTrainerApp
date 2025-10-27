@@ -526,8 +526,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   };
 
-  const toggleHolidayWeek = async () => {
-
     const toggleHolidayWeek = async () => {
       const key = `${weekNumber}-${year}`;
 
