@@ -74,60 +74,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
   };
 
-  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
-  const getGroupedActivities = () => {
-    const grouped = weekActivities.reduce((acc, activity) => {
-      const key = `${activity.date}_${activity.title}`;
-      if (!acc[key]) {
-        acc[key] = {
-          ...activity,
-          trainers: []
-        };
-      }
-      acc[key].trainers.push({
-        id: activity.trainer_id,
-        hours: activity.hours
-      });
-      return acc;
-    }, {});
-    return Object.values(grouped);
-  };
-
-  // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
-  const getActivitiesForDay = (dayOfWeek) => {
-    const dayIndex = daysOfWeek.indexOf(dayOfWeek);
-    if (dayIndex === -1) return [];
-    
-    const groupedActivities = getGroupedActivities();
-    
-    return groupedActivities.filter(activity => {
-      const activityDate = new Date(activity.date);
-      const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
-      return activityDayIndex === dayIndex;
-    });
-  };
-
-  // v2.4.2: Hole Aktivitäts-Typ Label
-  const getActivityTypeLabel = (type, customType) => {
-    const types = {
-      'ferienspass': 'Ferienspaß',
-      'vereinsfest': 'Vereinsfest',
-      'workshop': 'Workshop',
-      'fortbildung': 'Fortbildung',
-      'sonstiges': customType || 'Sonstiges'
-    };
-    return types[type] || type;
-  };
-
-  // v2.4.2: Hole Trainer-Name
-  const getTrainerName = (trainerId) => {
-    const trainer = trainers.find(t => t.id === trainerId);
-    if (!trainer) return 'Unbekannt';
-    const firstName = trainer.firstName || trainer.first_name || '';
-    const lastName = trainer.lastName || trainer.last_name || '';
-    return `${firstName} ${lastName}`.trim();
-  };
-
   // Lade Woche-Status beim Mount und bei Wechsel
   useEffect(() => {
     const syncPastDays = async () => {
@@ -515,6 +461,51 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return `${firstName} ${lastName}`;
   };
 
+  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
+  const getGroupedActivities = () => {
+    const grouped = weekActivities.reduce((acc, activity) => {
+      const key = `${activity.date}_${activity.title}`;
+      if (!acc[key]) {
+        acc[key] = {
+          ...activity,
+          trainers: []
+        };
+      }
+      acc[key].trainers.push({
+        id: activity.trainer_id,
+        hours: activity.hours
+      });
+      return acc;
+    }, {});
+    return Object.values(grouped);
+  };
+
+  // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
+  const getActivitiesForDay = (dayOfWeek) => {
+    const dayIndex = daysOfWeek.indexOf(dayOfWeek);
+    if (dayIndex === -1) return [];
+    
+    const groupedActivities = getGroupedActivities();
+    
+    return groupedActivities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
+      return activityDayIndex === dayIndex;
+    });
+  };
+
+  // v2.4.2: Hole Aktivitäts-Typ Label
+  const getActivityTypeLabel = (type, customType) => {
+    const types = {
+      'ferienspass': 'Ferienspaß',
+      'vereinsfest': 'Vereinsfest',
+      'workshop': 'Workshop',
+      'fortbildung': 'Fortbildung',
+      'sonstiges': customType || 'Sonstiges'
+    };
+    return types[type] || type;
+  };
+
   // v2.3.4: Trainer hinzufügen
   const addTrainerToCourse = (courseId, trainerId) => {
     if (!trainerId) return;
@@ -637,43 +628,26 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
       {/* Kursliste */}
       <div className="space-y-3">
-        {(() => {
-          // Gruppiere Kurse nach Tagen
-          const coursesAndActivitiesByDay = {};
+        {filteredCourses.map(course => {
+          const isExpanded = expandedCourses.has(course.id);
+          const status = getStaffingStatus(course);
+          const bgColor = isCourseCancel(course.id) 
+            ? 'bg-gray-100 border-gray-400 opacity-60' 
+            : status.color === 'red' ? 'bg-red-50 border-red-300' :
+              status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
+              status.color === 'green' ? 'bg-green-50 border-green-300' :
+              'bg-blue-50 border-blue-300';
           
-          filteredCourses.forEach(course => {
-            const day = course.dayOfWeek || course.day_of_week;
-            if (!coursesAndActivitiesByDay[day]) {
-              coursesAndActivitiesByDay[day] = { courses: [], activities: [] };
-            }
-            coursesAndActivitiesByDay[day].courses.push(course);
-          });
-          
-          // Füge Aktivitäten hinzu
-          Object.keys(coursesAndActivitiesByDay).forEach(day => {
-            coursesAndActivitiesByDay[day].activities = getActivitiesForDay(day);
-          });
-          
-          // Rendere alle Kurse
-          return filteredCourses.map(course => {
-            const isExpanded = expandedCourses.has(course.id);
-            const status = getStaffingStatus(course);
-            const bgColor = isCourseCancel(course.id) 
-              ? 'bg-gray-100 border-gray-400 opacity-60' 
-              : status.color === 'red' ? 'bg-red-50 border-red-300' :
-                status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
-                status.color === 'green' ? 'bg-green-50 border-green-300' :
-                'bg-blue-50 border-blue-300';
-            
-            const day = course.dayOfWeek || course.day_of_week;
-            const isLastCourseOfDay = filteredCourses.filter(c => 
-              (c.dayOfWeek || c.day_of_week) === day
-            ).pop()?.id === course.id;
-            const dayActivities = isLastCourseOfDay ? getActivitiesForDay(day) : [];
+          // Prüfe ob dies der letzte Kurs dieses Tages ist
+          const day = course.dayOfWeek || course.day_of_week;
+          const isLastCourseOfDay = filteredCourses.filter(c => 
+            (c.dayOfWeek || c.day_of_week) === day
+          ).pop()?.id === course.id;
+          const dayActivities = isLastCourseOfDay ? getActivitiesForDay(day) : [];
 
-            return (
-              <React.Fragment key={course.id}>
-                <div className={`border-2 rounded-lg ${bgColor}`}>
+          return (
+            <React.Fragment key={course.id}>
+              <div className={`border-2 rounded-lg ${bgColor}`}>
               <div className="p-3 sm:p-4">
                 {isCourseCancel(course.id) && (
                   <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2">
@@ -857,13 +831,13 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
               </div>
             </div>
             
-            {/* v2.4.2: Aktivitäten für diesen Tag (nach dem letzten Kurs des Tages) */}
+            {/* v2.4.2: Aktivitäten für diesen Tag (nach dem letzten Kurs) */}
             {dayActivities.length > 0 && dayActivities.map((activity, actIdx) => {
               const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
               const trainerCount = activity.trainers.length;
               const trainerNames = activity.trainers
                 .map(t => getTrainerName(t.id))
-                .filter(name => name !== 'Unbekannt')
+                .filter(name => name !== 'Unbekannter Trainer')
                 .join(', ');
               
               return (
@@ -898,7 +872,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             })}
           </React.Fragment>
           );
-        })();
         })}
       </div>
 
