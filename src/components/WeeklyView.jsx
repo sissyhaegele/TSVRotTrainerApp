@@ -357,15 +357,11 @@ const getGroupedActivities = () => {
 
 // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
 const getActivitiesForDay = (dayOfWeek) => {
-  const dayIndex = daysOfWeek.indexOf(dayOfWeek);
-  if (dayIndex === -1) return [];
-  
   const groupedActivities = getGroupedActivities();
   
+  // v2.4.3: Nutze day_of_week direkt aus DB (konsistent mit Kursen)
   return groupedActivities.filter(activity => {
-    const activityDate = new Date(activity.date);
-    const activityDayIndex = (activityDate.getDay() + 6) % 7; // Montag = 0
-    return activityDayIndex === dayIndex;
+    return (activity.day_of_week || '').toLowerCase() === dayOfWeek.toLowerCase();
   });
 };
 
