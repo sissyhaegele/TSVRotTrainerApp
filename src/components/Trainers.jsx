@@ -34,6 +34,15 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // ✅ Aktuellen Monat für Anzeige
+  const getCurrentMonthName = () => {
+    const monthNames = [
+      'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+    ];
+    return monthNames[new Date().getMonth()];
+  };
+
   // Lade Trainer beim Start
   useEffect(() => {
     loadTrainers();
@@ -562,7 +571,7 @@ export default function Trainers({ trainers, setTrainers, deleteMode, adminMode,
                       <div className="text-xl sm:text-2xl font-bold text-gray-600">
                         {trainerStats[trainer.id]?.monthlyHours || 0}
                       </div>
-                      <div className="text-xs text-gray-600">Oktober</div>
+                      <div className="text-xs text-gray-600">{getCurrentMonthName()}</div>
                     </div>
                   </div>
                 </div>
