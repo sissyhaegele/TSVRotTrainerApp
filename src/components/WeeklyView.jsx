@@ -135,13 +135,53 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           const allAssignments = await response.json();
 
           const formattedAssignments = {};
+          const coursesWithoutAssignments = [];
+
+          // Formatiere existierende Assignments
           Object.entries(allAssignments).forEach(([courseId, trainers]) => {
             formattedAssignments[`${courseId}-${weekNum}-${year}`] =
               trainers.map(t => t.trainerId);
           });
 
+          // ✅ NEU: Finde Kurse OHNE Assignments (neue Woche!)
+          courses.forEach(course => {
+            const key = `${course.id}-${weekNum}-${year}`;
+            if (!formattedAssignments[key] && course.assignedTrainerIds?.length > 0) {
+              // Dieser Kurs hat Defaults, aber keine Weekly Assignments
+              formattedAssignments[key] = course.assignedTrainerIds;
+              coursesWithoutAssignments.push(course.id);
+            }
+          });
+
           setWeeklyAssignments(formattedAssignments);
           console.log(`📥 Weekly Assignments geladen für KW ${weekNum}/${year}`);
+
+          // ✅ NEU: Wenn Kurse ohne Assignments gefunden wurden, speichere Defaults
+          if (coursesWithoutAssignments.length > 0) {
+            console.log(`💡 ${coursesWithoutAssignments.length} Kurse ohne Assignments gefunden - speichere Defaults...`);
+            
+            // Speichere die Defaults sofort
+            for (const courseId of coursesWithoutAssignments) {
+              const course = courses.find(c => c.id === courseId);
+              if (course && course.assignedTrainerIds?.length > 0) {
+                try {
+                  await fetch(`${API_URL}/weekly-assignments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      course_id: courseId,
+                      week_number: weekNum,
+                      year: year,
+                      trainer_ids: course.assignedTrainerIds
+                    })
+                  });
+                  console.log(`✅ Defaults gespeichert für Kurs ${courseId} KW ${weekNum}/${year}`);
+                } catch (error) {
+                  console.error(`❌ Fehler beim Speichern der Defaults für Kurs ${courseId}:`, error);
+                }
+              }
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading weekly assignments:', error);
