@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X, Sparkles } from 'lucide-react';
+import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X, Sparkles, MessageSquare, Edit3 } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8181/api'
@@ -26,6 +26,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
   // v2.4.5: Course Exceptions (Ferien-Override)
   const [courseExceptions, setCourseExceptions] = useState(new Set());
+
+  // ✅ NEU v2.5.0: Kurs-Notizen
+  const [courseNotes, setCourseNotes] = useState({});
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteText, setNoteText] = useState('');
 
   // KW berechnen
   const getWeekNumber = (date) => {
@@ -55,6 +60,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
     // Sonst: Defaults (first-time Anzeige)
     return course.assignedTrainerIds || [];
+  };
+
+  // ✅ NEU v2.5.0: Notiz für einen Kurs holen
+  const getCourseNote = (courseId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    return courseNotes[key] || '';
   };
 
   // Sortiere Trainer nach Verfügbarkeit und Nachname
@@ -135,12 +146,22 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           const allAssignments = await response.json();
 
           const formattedAssignments = {};
+          const formattedNotes = {};
           const coursesWithoutAssignments = [];
 
-          // Formatiere existierende Assignments
-          Object.entries(allAssignments).forEach(([courseId, trainers]) => {
-            formattedAssignments[`${courseId}-${weekNum}-${year}`] =
-              trainers.map(t => t.trainerId);
+          // Formatiere existierende Assignments UND Notizen
+          Object.entries(allAssignments).forEach(([courseId, data]) => {
+            // data kann entweder Array (alte Struktur) oder Object mit trainers und note sein
+            if (Array.isArray(data)) {
+              formattedAssignments[`${courseId}-${weekNum}-${year}`] = data.map(t => t.trainerId);
+            } else {
+              formattedAssignments[`${courseId}-${weekNum}-${year}`] = 
+                (data.trainers || []).map(t => t.trainerId);
+              // ✅ NEU: Notiz extrahieren
+              if (data.note) {
+                formattedNotes[`${courseId}-${weekNum}-${year}`] = data.note;
+              }
+            }
           });
 
           // ✅ NEU: Finde Kurse OHNE Assignments (neue Woche!)
@@ -154,6 +175,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           });
 
           setWeeklyAssignments(formattedAssignments);
+          setCourseNotes(formattedNotes);
           console.log(`📥 Weekly Assignments geladen für KW ${weekNum}/${year}`);
 
           // ✅ NEU: Wenn Kurse ohne Assignments gefunden wurden, speichere Defaults
@@ -212,6 +234,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
       try {
         for (const [courseId, trainerIds] of Object.entries(currentWeekAssignments)) {
+          const key = `${courseId}-${weekNum}-${year}`;
+          const note = courseNotes[key] || null;
+          
           console.log(`📤 Speichere Kurs ${courseId} KW ${weekNum}/${year}: [${trainerIds.join(', ')}]`);
 
           await fetch(`${API_URL}/weekly-assignments`, {
@@ -221,7 +246,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
               course_id: parseInt(courseId),
               week_number: weekNum,
               year: year,
-              trainer_ids: trainerIds
+              trainer_ids: trainerIds,
+              note: note  // ✅ NEU: Notiz mitsenden
             })
           });
         }
@@ -240,6 +266,56 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
     return () => clearTimeout(timeoutId);
   }, [weeklyAssignments]);
+
+  // ✅ NEU v2.5.0: Notiz speichern
+  const saveNote = async (courseId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    const trimmedNote = noteText.trim();
+    
+    try {
+      await fetch(`${API_URL}/weekly-assignments/note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: courseId,
+          week_number: weekNumber,
+          year: year,
+          note: trimmedNote || null
+        })
+      });
+
+      // State aktualisieren
+      setCourseNotes(prev => {
+        const newNotes = { ...prev };
+        if (trimmedNote) {
+          newNotes[key] = trimmedNote;
+        } else {
+          delete newNotes[key];
+        }
+        return newNotes;
+      });
+
+      console.log(`📝 Notiz gespeichert für Kurs ${courseId}: "${trimmedNote}"`);
+    } catch (error) {
+      console.error('Fehler beim Speichern der Notiz:', error);
+    }
+
+    setEditingNoteId(null);
+    setNoteText('');
+  };
+
+  // ✅ NEU v2.5.0: Notiz-Bearbeitung starten
+  const startEditNote = (courseId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    setEditingNoteId(courseId);
+    setNoteText(courseNotes[key] || '');
+  };
+
+  // ✅ NEU v2.5.0: Notiz-Bearbeitung abbrechen
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setNoteText('');
+  };
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
@@ -279,23 +355,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     };
 
     loadHolidayWeeks();
-  }, [weekNumber, year]);
-
-  // v2.4.2: Lade Aktivitäten der aktuellen Woche
-  useEffect(() => {
-    const loadWeekActivities = async () => {
-      try {
-        const response = await fetch(`${API_URL}/special-activities/week/${weekNumber}/${year}`);
-        if (response.ok) {
-          const data = await response.json();
-          setWeekActivities(data);
-        }
-      } catch (error) {
-        console.error('Fehler beim Laden der Wochen-Aktivitäten:', error);
-      }
-    };
-
-    loadWeekActivities();
   }, [weekNumber, year]);
 
   // v2.4.2: Lade Aktivitäten der aktuellen Woche
@@ -390,9 +449,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const changeWeek = async (direction) => {
     // v2.3.5: Schließe alle offenen Kurse BEVOR Woche wechselt
     setExpandedCourses(new Set());
+    // ✅ NEU: Notiz-Editor schließen beim Wochenwechsel
+    setEditingNoteId(null);
+    setNoteText('');
 
     // Zur neuen Woche wechseln
-    // (finalize-week nicht mehr nötig - sync-past-days beim App-Load macht das automatisch)
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() + (direction * 7));
     setCurrentWeek(newDate);
@@ -439,7 +500,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   const getActivitiesForDay = (dayOfWeek) => {
     const groupedActivities = getGroupedActivities();
 
-    // v2.4.3: Nutze day_of_week direkt aus DB (konsistent mit Kursen)
     return groupedActivities.filter(activity => {
       return (activity.day_of_week || '').toLowerCase() === dayOfWeek.toLowerCase();
     });
@@ -516,57 +576,49 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         }
       }
     } catch (error) {
-      console.error('Fehler beim Speichern:', error);
-      alert('Fehler beim Speichern der Änderung');
+      console.error('Fehler beim Umschalten des Ausfalls:', error);
     }
   };
 
-
-  // v2.4.5: Toggle Course Exception (Kurs trotz Ferien)
+  // v2.4.5: Course Exception Toggle (Kurs findet trotz Ferien statt)
   const toggleCourseException = async (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
-    const hasException = courseExceptions.has(key);
 
     try {
-      if (hasException) {
-        // Exception entfernen (Kurs fällt wieder aus)
-        const response = await fetch(
-          `${API_URL}/course-exceptions?course_id=${courseId}&week_number=${weekNumber}&year=${year}`,
-          { method: 'DELETE' }
-        );
+      if (courseExceptions.has(key)) {
+        // Ausnahme entfernen
+        await fetch(`${API_URL}/course-exceptions/${courseId}/${weekNumber}/${year}`, {
+          method: 'DELETE'
+        });
 
-        if (response.ok) {
-          const newExceptions = new Set(courseExceptions);
-          newExceptions.delete(key);
-          setCourseExceptions(newExceptions);
-        }
+        const newExceptions = new Set(courseExceptions);
+        newExceptions.delete(key);
+        setCourseExceptions(newExceptions);
+        console.log(`🗑️ Kurs-Ausnahme entfernt: ${courseId}`);
       } else {
-        // Exception hinzufügen (Kurs findet trotz Ferien statt)
-        const response = await fetch(`${API_URL}/course-exceptions`, {
+        // Ausnahme hinzufügen
+        await fetch(`${API_URL}/course-exceptions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             course_id: courseId,
             week_number: weekNumber,
-            year: year,
-            exception_type: 'active_in_holiday',
-            reason: 'Manuell aktiviert trotz Ferien'
+            year: year
           })
         });
 
-        if (response.ok) {
-          const newExceptions = new Set(courseExceptions);
-          newExceptions.add(key);
-          setCourseExceptions(newExceptions);
-        }
+        const newExceptions = new Set(courseExceptions);
+        newExceptions.add(key);
+        setCourseExceptions(newExceptions);
+        console.log(`✅ Kurs-Ausnahme hinzugefügt: ${courseId}`);
       }
     } catch (error) {
-      console.error('Fehler beim Speichern der Ausnahme:', error);
-      alert('Fehler beim Speichern der Änderung');
+      console.error('Fehler beim Umschalten der Kurs-Ausnahme:', error);
     }
   };
 
-const toggleHolidayWeek = async () => {
+  // Ferienwoche Toggle
+  const toggleHolidayWeek = async () => {
     const key = `${weekNumber}-${year}`;
 
     try {
@@ -586,7 +638,8 @@ const toggleHolidayWeek = async () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             week_number: weekNumber,
-            year: year
+            year: year,
+            name: `Ferien KW ${weekNumber}`
           })
         });
 
@@ -597,513 +650,577 @@ const toggleHolidayWeek = async () => {
         }
       }
     } catch (error) {
-      console.error('Fehler beim Speichern der Ferienwoche:', error);
-      alert('Fehler beim Speichern der Ferienwoche');
+      console.error('Fehler beim Umschalten der Ferienwoche:', error);
     }
   };
 
-    // Filter und Sortierung
-    const filteredCourses = React.useMemo(() => {
-      let filtered = [...courses];
+  // Trainer-Funktionen
+  const addTrainerToCourse = (courseId, trainerId) => {
+    if (!trainerId) return;
 
-      if (selectedDay !== 'Alle') {
-        filtered = filtered.filter(c => (c.dayOfWeek || c.day_of_week) === selectedDay);
-      }
+    const key = `${courseId}-${weekNumber}-${year}`;
+    const currentTrainers = weeklyAssignments[key] ||
+      courses.find(c => c.id === courseId)?.assignedTrainerIds || [];
 
-      const dayOrder = { 'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7 };
-      filtered.sort((a, b) => {
-        // FIX: Unterstütze beide Feldnamen
-        const aDayOfWeek = a.dayOfWeek || a.day_of_week;
-        const bDayOfWeek = b.dayOfWeek || b.day_of_week;
-        const dayDiff = dayOrder[aDayOfWeek] - dayOrder[bDayOfWeek];
-        if (dayDiff !== 0) return dayDiff;
-        // FIX: Unterstütze beide Feldnamen für startTime
-        return (a.startTime || a.start_time || '').localeCompare(b.startTime || b.start_time || '');
-      });
+    if (!currentTrainers.includes(parseInt(trainerId))) {
+      setWeeklyAssignments(prev => ({
+        ...prev,
+        [key]: [...currentTrainers, parseInt(trainerId)]
+      }));
+    }
+  };
 
-      return filtered;
-    }, [courses, selectedDay]);
+  const removeTrainerFromCourse = (courseId, trainerId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    const currentTrainers = weeklyAssignments[key] ||
+      courses.find(c => c.id === courseId)?.assignedTrainerIds || [];
 
+    setWeeklyAssignments(prev => ({
+      ...prev,
+      [key]: currentTrainers.filter(id => id !== parseInt(trainerId))
+    }));
+  };
 
-    // UI-Funktionen
-    const toggleCourseExpansion = (courseId) => {
-      const newExpanded = new Set(expandedCourses);
-      if (newExpanded.has(courseId)) {
-        newExpanded.delete(courseId);
-      } else {
-        newExpanded.add(courseId);
-      }
-      setExpandedCourses(newExpanded);
-    };
+  // Kurs-Erweiterung Toggle
+  const toggleCourseExpansion = (courseId) => {
+    const newExpanded = new Set(expandedCourses);
+    if (newExpanded.has(courseId)) {
+      newExpanded.delete(courseId);
+    } else {
+      newExpanded.add(courseId);
+    }
+    setExpandedCourses(newExpanded);
+  };
 
-    const getTrainerName = (trainerId) => {
-      const trainer = trainers.find(t => t.id === trainerId);
-      if (!trainer) return 'Unbekannter Trainer';
-      const firstName = trainer.firstName || trainer.first_name || '';
-      const lastName = trainer.lastName || trainer.last_name || '';
-      return `${firstName} ${lastName}`;
-    };
+  // Trainer-Name holen
+  const getTrainerName = (trainerId) => {
+    const trainer = trainers.find(t => t.id === trainerId);
+    if (!trainer) return 'Unbekannter Trainer';
 
-    // v2.3.4: Trainer hinzufügen
-    const addTrainerToCourse = (courseId, trainerId) => {
-      if (!trainerId) return;
+    const firstName = trainer.firstName || trainer.first_name || '';
+    const lastName = trainer.lastName || trainer.last_name || '';
+    return `${firstName} ${lastName}`.trim();
+  };
 
-      const course = courses.find(c => c.id === courseId);
-      if (!course) return;
+  // Besetzungs-Status berechnen
+  const getStaffingStatus = (course) => {
+    const assigned = getWeeklyTrainers(course).length;
+    const required = course.requiredTrainers || course.required_trainers || 2;
 
-      const weekNum = getWeekNumber(selectedWeek);
-      const year = selectedWeek.getFullYear();
-      const key = `${courseId}-${weekNum}-${year}`;
+    if (assigned === 0) return { color: 'red', message: 'Nicht besetzt' };
+    if (assigned < required) return { color: 'yellow', message: `${assigned}/${required} Trainer` };
+    if (assigned === required) return { color: 'green', message: 'Optimal besetzt' };
+    return { color: 'blue', message: `Überbesetzt (${assigned}/${required})` };
+  };
 
-      setWeeklyAssignments(prev => {
-        const currentAssignments = prev[key] || getWeeklyTrainers(course) || [];
+  // Kurse filtern
+  const filteredCourses = courses.filter(course => {
+    if (selectedDay === 'Alle') return true;
+    return (course.dayOfWeek || course.day_of_week) === selectedDay;
+  });
 
-        if (currentAssignments.includes(parseInt(trainerId))) {
-          return prev;
-        }
+  // Monats-Header generieren
+  const getWeekDateRange = () => {
+    const date = new Date(currentWeek);
+    const currentDay = date.getDay() || 7;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - currentDay + 1);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
 
-        console.log(`➕ Trainer ${trainerId} zu Kurs ${courseId} hinzugefügt`);
+    return `${formatDate(monday)} - ${formatDate(sunday)}`;
+  };
 
-        return {
-          ...prev,
-          [key]: [...currentAssignments, parseInt(trainerId)]
-        };
-      });
-    };
+  return (
+    <div className="space-y-4">
+      {/* Header mit KW-Navigation */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => changeWeek(-1)}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              title="Vorherige Woche"
+            >
+              ◀
+            </button>
 
-    // v2.3.4: Trainer entfernen - ALLE können gelöscht werden
-    const removeTrainerFromCourse = (courseId, trainerId) => {
-      const course = courses.find(c => c.id === courseId);
-      if (!course) return;
-
-      const weekNum = getWeekNumber(selectedWeek);
-      const year = selectedWeek.getFullYear();
-      const key = `${courseId}-${weekNum}-${year}`;
-
-      console.log(`❌ Trainer ${trainerId} aus Kurs ${courseId} entfernt`);
-
-      setWeeklyAssignments(prev => {
-        const currentAssignments = prev[key] || getWeeklyTrainers(course) || [];
-        const trainerIdInt = parseInt(trainerId);
-        const filtered = currentAssignments.filter(id => id !== trainerIdInt);
-
-        return {
-          ...prev,
-          [key]: filtered
-        };
-      });
-    };
-
-    const getStaffingStatus = (course) => {
-      const weeklyTrainerIds = getWeeklyTrainers(course);
-      const assigned = weeklyTrainerIds.length;
-      const required = course.requiredTrainers || course.required_trainers || 2;
-
-      if (assigned === 0) return { status: 'critical', color: 'red', message: 'Keine Trainer' };
-      if (assigned < required) return { status: 'warning', color: 'yellow', message: `${required - assigned} fehlt` };
-      if (assigned === required) return { status: 'optimal', color: 'green', message: '' };
-      return { status: 'overstaffed', color: 'blue', message: `+${assigned - required} Extra` };
-    };
-
-    // RENDER
-    return (
-      <div>
-        {/* KW Navigation */}
-        <div className="mb-3 flex items-center justify-between bg-white p-3 rounded-lg border">
-          <button
-            onClick={() => changeWeek(-1)}
-            className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
-            disabled={finalizingWeek}
-          >
-            ←
-          </button>
-
-          <div className="text-center flex-1">
-            <div className="font-bold">KW {weekNumber}/{year}</div>
-            {weekStatus.weekSaved && (
-              <div className="text-xs text-green-600 mt-1">
-                ✅ {weekStatus.sessionCount} Sessions ({weekStatus.totalHours}h)
+            <div className="text-center">
+              <div className="text-xl font-bold text-gray-900">
+                KW {weekNumber} / {year}
               </div>
-            )}
+              <div className="text-sm text-gray-500">
+                {getWeekDateRange()}
+              </div>
+            </div>
+
+            <button
+              onClick={() => changeWeek(1)}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              title="Nächste Woche"
+            >
+              ▶
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCurrentWeek(new Date())}
+              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200"
+            >
+              Heute
+            </button>
+
             <button
               onClick={toggleHolidayWeek}
-              className={`mt-1 px-3 py-1 text-sm rounded-full ${isHolidayWeek()
-                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`px-3 py-1 text-sm rounded ${isHolidayWeek()
+                  ? 'bg-yellow-200 text-yellow-900 hover:bg-yellow-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
             >
               {isHolidayWeek() ? '🏖️ Ferien aktiv' : '🏖️ Als Ferien markieren'}
             </button>
           </div>
-
-          <button
-            onClick={() => changeWeek(1)}
-            disabled={finalizingWeek}
-            className={`px-3 py-1 rounded ${finalizingWeek
-                ? 'bg-gray-300 cursor-wait'
-                : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-          >
-            {finalizingWeek ? '⏳' : '→'}
-          </button>
         </div>
 
-        {/* Filter */}
-        <div className="mb-4 flex justify-end">
-          <select
-            value={selectedDay}
-            onChange={(e) => setSelectedDay(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-sm sm:text-base"
-          >
-            <option value="Alle">Alle Tage</option>
-            {daysOfWeek.map(day => (
-              <option key={day} value={day}>{day}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Kursliste - v2.4.2: Gruppiert nach Tagen */}
-        <div className="space-y-6">
-          {(() => {
-            // Welche Tage sollen angezeigt werden?
-            const daysToShow = selectedDay === 'Alle' ? daysOfWeek : [selectedDay];
-            console.log('🔍 DEBUG:', {
-              daysToShow,
-              filteredCoursesTotal: filteredCourses.length,
-              firstCourse: filteredCourses[0]
-            });
-
-            return daysToShow.map(day => {
-              // Kurse für diesen Tag
-              const dayCourses = filteredCourses.filter(course =>
-                (course.dayOfWeek || course.day_of_week) === day
-              );
-
-              // Aktivitäten für diesen Tag
-              const dayActivities = getActivitiesForDay(day);
-              console.log(`📅 ${day}:`, {
-                dayCourses: dayCourses.length,
-                dayActivities: dayActivities.length
-              });
-
-              // Wenn weder Kurse noch Aktivitäten: Tag überspringen
-              if (dayCourses.length === 0 && dayActivities.length === 0) {
-                return null;
-              }
-
-              return (
-                <div key={day} className="space-y-3">
-                  {/* Tages-Header */}
-                  <div className="border-b-2 border-red-600 pb-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-red-600" />
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-xl">{day}</h3>
-                        <span className="text-gray-500 text-sm">{formatDate(getDateForCourse(day))}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Kurse */}
-                  {dayCourses.map(course => {
-                    const isExpanded = expandedCourses.has(course.id);
-                    const status = getStaffingStatus(course);
-                    const bgColor = isCourseCancel(course.id)
-                      ? 'bg-gray-100 border-gray-400 opacity-60'
-                      : status.color === 'red' ? 'bg-red-50 border-red-300' :
-                        status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
-                          status.color === 'green' ? 'bg-green-50 border-green-300' :
-                            'bg-blue-50 border-blue-300';
-
-                    return (
-                      <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
-                        <div className="p-3 sm:p-4">
-                          {isCourseCancel(course.id) && !hasCourseException(course.id) && (
-                            <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">🚫</span>
-                                  <span className="text-sm font-medium text-red-800">
-                                    {isHolidayWeek() ? 'AUSGEFALLEN - Ferien' : 'AUSGEFALLEN'}
-                                  </span>
-                                </div>
-                                {isHolidayWeek() && (
-                                  <button
-                                    onClick={() => toggleCourseException(course.id)}
-                                    className="text-xs px-3 py-1 bg-green-100 text-green-800 border border-green-300 rounded hover:bg-green-200 font-medium"
-                                  >
-                                    ✓ Trotzdem stattfinden lassen
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {isHolidayWeek() && hasCourseException(course.id) && (
-                            <div className="mb-2 px-3 py-2 bg-green-100 border border-green-300 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg">✅</span>
-                                  <span className="text-sm font-medium text-green-800">
-                                    FINDET STATT - Trotz Ferien
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => toggleCourseException(course.id)}
-                                  className="text-xs px-3 py-1 bg-red-100 text-red-800 border border-red-300 rounded hover:bg-red-200 font-medium"
-                                >
-                                  ✗ Doch ausfallen lassen
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <button
-                                  onClick={() => toggleCourseExpansion(course.id)}
-                                  className="mt-1 p-1 hover:bg-white hover:bg-opacity-50 rounded-full"
-                                >
-                                  {isExpanded ?
-                                    <ChevronDown className="w-5 h-5" /> :
-                                    <ChevronRight className="w-5 h-5" />
-                                  }
-                                </button>
-                                <div className="flex-1">
-                                  <div className="font-bold text-gray-900 text-sm sm:text-base">
-                                    {course.startTime || course.start_time || '?'}
-                                  </div>
-                                  <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
-                                    {course.name}
-                                  </div>
-                                  {course.location && (
-                                    <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mt-1">
-                                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                                      {course.location}
-                                    </div>
-                                  )}
-                                  {course.category && (
-                                    <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                      {course.category}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="mt-3 ml-8 grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4">
-                                <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
-                                  <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  {course.endTime || course.end_time ? `bis ${course.endTime || course.end_time}` : '60 Min'}
-                                </span>
-                                <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
-                                  <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  {getWeeklyTrainers(course).length}/{course.requiredTrainers || course.required_trainers || 2}
-                                </span>
-                              </div>
-
-                              <div className="mt-3 ml-8">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
-                                    status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                                      status.color === 'red' ? 'bg-red-100 text-red-800' :
-                                        'bg-blue-100 text-blue-800'
-                                  }`}>
-                                  {status.message}
-                                </span>
-                              </div>
-
-                              {(() => {
-                                const weeklyTrainerIds = getWeeklyTrainers(course);
-                                return weeklyTrainerIds.length > 0 && (
-                                  <div className="mt-3 ml-8">
-                                    <div className="flex flex-wrap gap-1 sm:gap-2">
-                                      {weeklyTrainerIds.map(trainerId => (
-                                        <span key={trainerId} className="inline-flex items-center px-2 py-1 bg-white rounded text-xs sm:text-sm border border-gray-200">
-                                          <UserCheck className="w-3 h-3 mr-1 text-green-600" />
-                                          {getTrainerName(trainerId)}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                              <div className="sm:ml-9">
-                                <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer verwalten:</h4>
-
-                                {(() => {
-                                  const weeklyTrainerIds = getWeeklyTrainers(course);
-                                  const courseDayOfWeek = course.dayOfWeek || course.day_of_week;
-
-                                  return weeklyTrainerIds.length > 0 && (
-                                    <div className="mb-3 space-y-1">
-                                      {weeklyTrainerIds.map(trainerId => {
-                                        const trainer = trainers.find(t => t.id === trainerId);
-                                        if (!trainer) return null;
-
-                                        const isAvailable = trainer.availability?.includes(courseDayOfWeek);
-
-                                        return (
-                                          <div key={trainerId} className="flex items-center justify-between bg-green-50 border border-green-200 rounded px-3 py-2">
-                                            <div className="flex items-center gap-2">
-                                              <UserCheck className="w-4 h-4 text-green-600" />
-                                              <span className="font-medium text-sm">{getTrainerName(trainerId)}</span>
-                                              {isAvailable && (
-                                                <span className="text-xs text-green-600">✓ Verfügbar</span>
-                                              )}
-                                            </div>
-                                            <button
-                                              onClick={() => removeTrainerFromCourse(course.id, trainerId)}
-                                              className="text-red-500 hover:text-red-700"
-                                              title="Entfernen"
-                                            >
-                                              <X className="w-4 h-4" />
-                                            </button>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })()}
-
-                                <select
-                                  className="w-full px-3 py-2 border rounded-lg bg-white"
-                                  value=""
-                                  onChange={(e) => addTrainerToCourse(course.id, e.target.value)}
-                                >
-                                  <option value="">Trainer hinzufügen...</option>
-                                  {getSortedTrainers(course.dayOfWeek || course.day_of_week).map(trainer => {
-                                    const weeklyTrainerIds = getWeeklyTrainers(course);
-                                    const isAssigned = weeklyTrainerIds.includes(trainer.id);
-                                    const isAvailable = trainer.availability?.includes(course.dayOfWeek || course.day_of_week);
-
-                                    if (isAssigned) return null;
-
-                                    const firstName = trainer.firstName || trainer.first_name || '';
-                                    const lastName = trainer.lastName || trainer.last_name || '';
-
-                                    return (
-                                      <option key={trainer.id} value={trainer.id}>
-                                        {firstName} {lastName} {isAvailable ? '✓' : ''}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week}
-                                </p>
-
-                                <div className="mt-4 pt-4 border-t">
-                                  <button
-                                    onClick={() => toggleCourseCancellation(course.id)}
-                                    className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${isCourseCancel(course.id)
-                                        ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
-                                        : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
-                                      }`}
-                                  >
-                                    {isCourseCancel(course.id) ? (
-                                      <>
-                                        <span>✓</span>
-                                        <span>Kurs reaktivieren</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span>🚫</span>
-                                        <span>Kurs ausfallen lassen</span>
-                                      </>
-                                    )}
-                                  </button>
-                                  {isCourseCancel(course.id) && !isHolidayWeek() && (
-                                    <p className="text-xs text-gray-600 mt-2">
-                                      Dieser Kurs ist für diese Woche ausgefallen.
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Aktivitäten für diesen Tag */}
-                  {dayActivities.map((activity, actIdx) => {
-                    const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
-                    const trainerCount = activity.trainers.length;
-                    const trainerNames = activity.trainers
-                      .map(t => getTrainerName(t.id))
-                      .filter(name => name !== 'Unbekannter Trainer')
-                      .join(', ');
-
-                    return (
-                      <div
-                        key={`activity-${activity.id}-${actIdx}`}
-                        className="border-2 border-green-400 rounded-lg bg-green-50"
-                      >
-                        <div className="p-3 sm:p-4">
-                          <div className="flex items-start gap-2 sm:gap-3">
-                            <div className="mt-1 p-1 bg-green-200 rounded-full">
-                              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
-                                  {activityTypeLabel}
-                                </span>
-                              </div>
-                              <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
-                                {activity.hours}h · {activity.title}
-                              </div>
-                              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
-                                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="font-medium">{trainerCount} Trainer:</span>
-                                <span className="text-gray-600">{trainerNames}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            });
-          })()}
-        </div>
-
-        {filteredCourses.length === 0 && weekActivities.length === 0 && (
-          <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
-            Keine Kurse oder Aktivitäten für {selectedDay === 'Alle' ? 'diese Woche' : selectedDay} vorhanden.
+        {/* Ferien-Banner */}
+        {isHolidayWeek() && (
+          <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏖️</span>
+              <div>
+                <span className="font-semibold text-yellow-800">Ferienwoche</span>
+                <span className="text-yellow-700 text-sm ml-2">
+                  Alle Kurse fallen aus (außer markierte Ausnahmen)
+                </span>
+              </div>
+            </div>
           </div>
         )}
 
-        <div className="mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
-          <h3 className="font-semibold text-xs sm:text-sm mb-2">Legende:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs sm:text-sm">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-100 border border-green-300 rounded"></div>
-              <span>Optimal</span>
+        {/* Status-Info */}
+        {weekStatus.sessionCount > 0 && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-green-600">✓</span>
+              <span className="text-sm text-green-800">
+                {weekStatus.sessionCount} Einheiten erfasst ({weekStatus.totalHours}h)
+              </span>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-              <span>Unterbesetzt</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border border-red-300 rounded"></div>
-              <span>Kritisch</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-100 border border-blue-300 rounded"></div>
-              <span>Überbesetzt</span>
-            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Filter */}
+      <div className="mb-4 flex justify-end">
+        <select
+          value={selectedDay}
+          onChange={(e) => setSelectedDay(e.target.value)}
+          className="w-full sm:w-auto px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-sm sm:text-base"
+        >
+          <option value="Alle">Alle Tage</option>
+          {daysOfWeek.map(day => (
+            <option key={day} value={day}>{day}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Kursliste - Gruppiert nach Tagen */}
+      <div className="space-y-6">
+        {(() => {
+          const daysToShow = selectedDay === 'Alle' ? daysOfWeek : [selectedDay];
+
+          return daysToShow.map(day => {
+            const dayCourses = filteredCourses.filter(course =>
+              (course.dayOfWeek || course.day_of_week) === day
+            );
+
+            const dayActivities = getActivitiesForDay(day);
+
+            if (dayCourses.length === 0 && dayActivities.length === 0) {
+              return null;
+            }
+
+            return (
+              <div key={day} className="space-y-3">
+                {/* Tages-Header */}
+                <div className="border-b-2 border-red-600 pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-red-600" />
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-xl">{day}</h3>
+                      <span className="text-gray-500 text-sm">{formatDate(getDateForCourse(day))}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kurse */}
+                {dayCourses.map(course => {
+                  const isExpanded = expandedCourses.has(course.id);
+                  const status = getStaffingStatus(course);
+                  const courseNote = getCourseNote(course.id);
+                  const bgColor = isCourseCancel(course.id)
+                    ? 'bg-gray-100 border-gray-400 opacity-60'
+                    : status.color === 'red' ? 'bg-red-50 border-red-300' :
+                      status.color === 'yellow' ? 'bg-yellow-50 border-yellow-300' :
+                        status.color === 'green' ? 'bg-green-50 border-green-300' :
+                          'bg-blue-50 border-blue-300';
+
+                  return (
+                    <div key={course.id} className={`border-2 rounded-lg ${bgColor}`}>
+                      <div className="p-3 sm:p-4">
+                        {/* Ausgefallen-Banner */}
+                        {isCourseCancel(course.id) && !hasCourseException(course.id) && (
+                          <div className="mb-2 px-3 py-2 bg-red-100 border border-red-300 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">🚫</span>
+                                <span className="text-sm font-medium text-red-800">
+                                  {isHolidayWeek() ? 'AUSGEFALLEN - Ferien' : 'AUSGEFALLEN'}
+                                </span>
+                              </div>
+                              {isHolidayWeek() && (
+                                <button
+                                  onClick={() => toggleCourseException(course.id)}
+                                  className="text-xs px-3 py-1 bg-green-100 text-green-800 border border-green-300 rounded hover:bg-green-200 font-medium"
+                                >
+                                  ✓ Trotzdem stattfinden lassen
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Findet trotz Ferien statt Banner */}
+                        {isHolidayWeek() && hasCourseException(course.id) && (
+                          <div className="mb-2 px-3 py-2 bg-green-100 border border-green-300 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">✅</span>
+                                <span className="text-sm font-medium text-green-800">
+                                  FINDET STATT - Trotz Ferien
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => toggleCourseException(course.id)}
+                                className="text-xs px-3 py-1 bg-red-100 text-red-800 border border-red-300 rounded hover:bg-red-200 font-medium"
+                              >
+                                ✗ Doch ausfallen lassen
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Kurs-Header */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-start gap-2 sm:gap-3">
+                              <button
+                                onClick={() => toggleCourseExpansion(course.id)}
+                                className="mt-1 p-1 hover:bg-white hover:bg-opacity-50 rounded-full"
+                              >
+                                {isExpanded ?
+                                  <ChevronDown className="w-5 h-5" /> :
+                                  <ChevronRight className="w-5 h-5" />
+                                }
+                              </button>
+                              <div className="flex-1">
+                                <div className="font-bold text-gray-900 text-sm sm:text-base">
+                                  {course.startTime || course.start_time || '?'}
+                                </div>
+                                <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
+                                  {course.name}
+                                </div>
+                                {course.location && (
+                                  <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mt-1">
+                                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    {course.location}
+                                  </div>
+                                )}
+                                {course.category && (
+                                  <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                    {course.category}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 ml-8 grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4">
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
+                                <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {course.endTime || course.end_time ? `bis ${course.endTime || course.end_time}` : '60 Min'}
+                              </span>
+                              <span className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
+                                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {getWeeklyTrainers(course).length}/{course.requiredTrainers || course.required_trainers || 2}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 ml-8">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${status.color === 'green' ? 'bg-green-100 text-green-800' :
+                                  status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                                    status.color === 'red' ? 'bg-red-100 text-red-800' :
+                                      'bg-blue-100 text-blue-800'
+                                }`}>
+                                {status.message}
+                              </span>
+                            </div>
+
+                            {/* Trainer-Badges */}
+                            {(() => {
+                              const weeklyTrainerIds = getWeeklyTrainers(course);
+                              return weeklyTrainerIds.length > 0 && (
+                                <div className="mt-3 ml-8">
+                                  <div className="flex flex-wrap gap-1 sm:gap-2">
+                                    {weeklyTrainerIds.map(trainerId => (
+                                      <span key={trainerId} className="inline-flex items-center px-2 py-1 bg-white rounded text-xs sm:text-sm border border-gray-200">
+                                        <UserCheck className="w-3 h-3 mr-1 text-green-600" />
+                                        {getTrainerName(trainerId)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* ✅ NEU: NOTIZ-ANZEIGE (immer sichtbar wenn vorhanden) */}
+                        {courseNote && editingNoteId !== course.id && (
+                          <div
+                            className="mt-3 ml-8 p-2 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
+                            onClick={() => startEditNote(course.id)}
+                          >
+                            <div className="flex items-start gap-2">
+                              <MessageSquare className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-sm text-amber-800 flex-1">{courseNote}</p>
+                              <Edit3 className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ✅ NEU: NOTIZ-EDITOR (wenn Bearbeitung aktiv) */}
+                        {editingNoteId === course.id && (
+                          <div className="mt-3 ml-8 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquare className="w-4 h-4 text-amber-600" />
+                              <span className="text-sm font-medium text-amber-800">Notiz bearbeiten</span>
+                            </div>
+                            <textarea
+                              className="w-full p-2 border border-amber-300 rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+                              rows="2"
+                              placeholder="z.B. Neue TN: Lisa M. (4 Jahre), Max S. (5 Jahre)"
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              autoFocus
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                              <button
+                                onClick={cancelEditNote}
+                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                              >
+                                Abbrechen
+                              </button>
+                              <button
+                                onClick={() => saveNote(course.id)}
+                                className="px-3 py-1 text-sm bg-amber-500 text-white rounded hover:bg-amber-600"
+                              >
+                                Speichern
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Aufgeklappter Bereich */}
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="sm:ml-9">
+                              <h4 className="font-medium mb-3 text-sm sm:text-base">Trainer verwalten:</h4>
+
+                              {/* Zugewiesene Trainer */}
+                              {(() => {
+                                const weeklyTrainerIds = getWeeklyTrainers(course);
+                                const courseDayOfWeek = course.dayOfWeek || course.day_of_week;
+
+                                return weeklyTrainerIds.length > 0 && (
+                                  <div className="mb-3 space-y-1">
+                                    {weeklyTrainerIds.map(trainerId => {
+                                      const trainer = trainers.find(t => t.id === trainerId);
+                                      if (!trainer) return null;
+
+                                      const isAvailable = trainer.availability?.includes(courseDayOfWeek);
+
+                                      return (
+                                        <div key={trainerId} className="flex items-center justify-between bg-green-50 border border-green-200 rounded px-3 py-2">
+                                          <div className="flex items-center gap-2">
+                                            <UserCheck className="w-4 h-4 text-green-600" />
+                                            <span className="font-medium text-sm">{getTrainerName(trainerId)}</span>
+                                            {isAvailable && (
+                                              <span className="text-xs text-green-600">✓ Verfügbar</span>
+                                            )}
+                                          </div>
+                                          <button
+                                            onClick={() => removeTrainerFromCourse(course.id, trainerId)}
+                                            className="text-red-500 hover:text-red-700"
+                                            title="Entfernen"
+                                          >
+                                            <X className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Trainer hinzufügen Dropdown */}
+                              <select
+                                className="w-full px-3 py-2 border rounded-lg bg-white"
+                                value=""
+                                onChange={(e) => addTrainerToCourse(course.id, e.target.value)}
+                              >
+                                <option value="">Trainer hinzufügen...</option>
+                                {getSortedTrainers(course.dayOfWeek || course.day_of_week).map(trainer => {
+                                  const weeklyTrainerIds = getWeeklyTrainers(course);
+                                  const isAssigned = weeklyTrainerIds.includes(trainer.id);
+                                  const isAvailable = trainer.availability?.includes(course.dayOfWeek || course.day_of_week);
+
+                                  if (isAssigned) return null;
+
+                                  const firstName = trainer.firstName || trainer.first_name || '';
+                                  const lastName = trainer.lastName || trainer.last_name || '';
+
+                                  return (
+                                    <option key={trainer.id} value={trainer.id}>
+                                      {firstName} {lastName} {isAvailable ? '✓' : ''}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <p className="text-xs text-gray-500 mt-1">
+                                ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week}
+                              </p>
+
+                              {/* ✅ NEU: Notiz hinzufügen Button (wenn keine Notiz vorhanden) */}
+                              {!courseNote && editingNoteId !== course.id && (
+                                <button
+                                  onClick={() => startEditNote(course.id)}
+                                  className="mt-3 w-full py-2 px-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span>Notiz hinzufügen (z.B. neue Teilnehmer)</span>
+                                </button>
+                              )}
+
+                              {/* Kurs ausfallen lassen */}
+                              <div className="mt-4 pt-4 border-t">
+                                <button
+                                  onClick={() => toggleCourseCancellation(course.id)}
+                                  className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${isCourseCancel(course.id)
+                                      ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
+                                      : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
+                                    }`}
+                                >
+                                  {isCourseCancel(course.id) ? (
+                                    <>
+                                      <span>✓</span>
+                                      <span>Kurs reaktivieren</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>🚫</span>
+                                      <span>Kurs ausfallen lassen</span>
+                                    </>
+                                  )}
+                                </button>
+                                {isCourseCancel(course.id) && !isHolidayWeek() && (
+                                  <p className="text-xs text-gray-600 mt-2">
+                                    Dieser Kurs ist für diese Woche ausgefallen.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Aktivitäten für diesen Tag */}
+                {dayActivities.map((activity, actIdx) => {
+                  const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
+                  const trainerCount = activity.trainers.length;
+                  const trainerNames = activity.trainers
+                    .map(t => getTrainerName(t.id))
+                    .filter(name => name !== 'Unbekannter Trainer')
+                    .join(', ');
+
+                  return (
+                    <div
+                      key={`activity-${activity.id}-${actIdx}`}
+                      className="border-2 border-green-400 rounded-lg bg-green-50"
+                    >
+                      <div className="p-3 sm:p-4">
+                        <div className="flex items-start gap-2 sm:gap-3">
+                          <div className="mt-1 p-1 bg-green-200 rounded-full">
+                            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
+                                {activityTypeLabel}
+                              </span>
+                            </div>
+                            <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
+                              {activity.hours}h · {activity.title}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
+                              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="font-medium">{trainerCount} Trainer:</span>
+                              <span className="text-gray-600">{trainerNames}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          });
+        })()}
+      </div>
+
+      {filteredCourses.length === 0 && weekActivities.length === 0 && (
+        <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
+          Keine Kurse oder Aktivitäten für {selectedDay === 'Alle' ? 'diese Woche' : selectedDay} vorhanden.
+        </div>
+      )}
+
+      {/* Legende */}
+      <div className="mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+        <h3 className="font-semibold text-xs sm:text-sm mb-2">Legende:</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs sm:text-sm">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-100 border border-green-300 rounded"></div>
+            <span>Optimal</span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+            <span>Unterbesetzt</span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border border-red-300 rounded"></div>
+            <span>Kritisch</span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-100 border border-blue-300 rounded"></div>
+            <span>Überbesetzt</span>
           </div>
         </div>
       </div>
+    </div>
   );
 };
 
