@@ -4,6 +4,7 @@ import WeeklyView from './components/WeeklyView';
 import Courses from './components/Courses';
 import Trainers from './components/Trainers';
 import Activities from './components/Activities';
+import PublicSchedule from './components/PublicSchedule';  // ← NEU
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
@@ -21,6 +22,19 @@ function App() {
   const [deleteMode, setDeleteMode] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // ============================================
+  // NEU: Öffentlicher Kursplan ohne Login
+  // ============================================
+  // Prüfe ob die URL /kursplan enthält
+  const isPublicKursplan = window.location.pathname === '/kursplan' || 
+                           window.location.pathname.startsWith('/kursplan');
+  
+  // Wenn /kursplan aufgerufen wird, zeige öffentliche Seite OHNE Login
+  if (isPublicKursplan) {
+    return <PublicSchedule />;
+  }
+  // ============================================
 
   useEffect(() => {
     const savedUser = localStorage.getItem('tsvrot-user');
