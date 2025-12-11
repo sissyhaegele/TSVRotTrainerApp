@@ -1,5 +1,6 @@
 // ============================================
 // PublicSchedule.jsx - Öffentliche Eltern-Ansicht
+// v2.8.0 - MIT ÖFFENTLICHEN NOTIZEN
 // Speichern unter: src/components/PublicSchedule.jsx
 // ============================================
 
@@ -182,6 +183,23 @@ export default function PublicSchedule() {
                       </div>
                     )}
                   </div>
+
+                  {/* =====================================================
+                      ✅ NEU v2.8.0: ÖFFENTLICHE NOTIZEN
+                      ===================================================== */}
+                  {course.public_notes && course.public_notes.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {course.public_notes.map((note, idx) => (
+                        <div 
+                          key={idx}
+                          className="flex items-start gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-lg"
+                        >
+                          <span className="text-orange-500 flex-shrink-0 mt-0.5">📢</span>
+                          <p className="text-sm text-orange-800">{note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
@@ -352,7 +370,7 @@ export default function PublicSchedule() {
             {/* Keine Kurse Hinweis */}
             {Object.values(schedule).every(courses => !courses || courses.length === 0) && (
               <div className="text-center py-12 text-gray-500">
-                <p className="text-xl">📭</p>
+                <p className="text-xl">🔭</p>
                 <p className="mt-2">Keine Kurse für diese Woche gefunden.</p>
               </div>
             )}

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Users, AlertCircle, UserX, UserCheck, ChevronDown, ChevronRight, MapPin, X, Sparkles, MessageSquare, Edit3 } from 'lucide-react';
+import NoteModal from './NoteModal';
+import NotesBadges from './NotesBadges';
+import NotesList from './NotesList';
 
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8181/api'
@@ -27,10 +30,13 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // v2.4.5: Course Exceptions (Ferien-Override)
   const [courseExceptions, setCourseExceptions] = useState(new Set());
 
-  // ✅ NEU v2.5.0: Kurs-Notizen
-  const [courseNotes, setCourseNotes] = useState({});
-  const [editingNoteId, setEditingNoteId] = useState(null);
-  const [noteText, setNoteText] = useState('');
+  // =====================================================
+  // ✅ NEU v2.8.0: Mehrfache Notizen (intern/extern)
+  // =====================================================
+  const [courseNotes, setCourseNotes] = useState({}); // { courseId: [note, note, ...] }
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteModalCourse, setNoteModalCourse] = useState(null);
+  const [noteModalNote, setNoteModalNote] = useState(null); // null = neu, object = bearbeiten
 
   // KW berechnen
   const getWeekNumber = (date) => {
@@ -62,10 +68,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return course.assignedTrainerIds || [];
   };
 
-  // ✅ NEU v2.5.0: Notiz für einen Kurs holen
-  const getCourseNote = (courseId) => {
-    const key = `${courseId}-${weekNumber}-${year}`;
-    return courseNotes[key] || '';
+  // =====================================================
+  // ✅ NEU v2.8.0: Notizen für einen Kurs holen (Array!)
+  // =====================================================
+  const getCourseNotes = (courseId) => {
+    return courseNotes[courseId] || [];
   };
 
   // Sortiere Trainer nach Verfügbarkeit und Nachname
@@ -146,43 +153,47 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           const allAssignments = await response.json();
 
           const formattedAssignments = {};
-          const formattedNotes = {};
+          const formattedNotes = {};  // v2.8.0: Notizen extrahieren
           const coursesWithoutAssignments = [];
 
           // Formatiere existierende Assignments UND Notizen
           Object.entries(allAssignments).forEach(([courseId, data]) => {
-            // data kann entweder Array (alte Struktur) oder Object mit trainers und note sein
             if (Array.isArray(data)) {
               formattedAssignments[`${courseId}-${weekNum}-${year}`] = data.map(t => t.trainerId);
             } else {
               formattedAssignments[`${courseId}-${weekNum}-${year}`] = 
                 (data.trainers || []).map(t => t.trainerId);
-              // ✅ NEU: Notiz extrahieren
-              if (data.note) {
-                formattedNotes[`${courseId}-${weekNum}-${year}`] = data.note;
+              
+              // v2.8.0: Notizen aus dem Backend-Response extrahieren
+              if (data.notes && data.notes.length > 0) {
+                formattedNotes[courseId] = data.notes;
               }
             }
           });
 
-          // ✅ NEU: Finde Kurse OHNE Assignments (neue Woche!)
+          // Finde Kurse OHNE Assignments (neue Woche!)
           courses.forEach(course => {
             const key = `${course.id}-${weekNum}-${year}`;
             if (!formattedAssignments[key] && course.assignedTrainerIds?.length > 0) {
-              // Dieser Kurs hat Defaults, aber keine Weekly Assignments
               formattedAssignments[key] = course.assignedTrainerIds;
               coursesWithoutAssignments.push(course.id);
             }
           });
 
           setWeeklyAssignments(formattedAssignments);
-          setCourseNotes(formattedNotes);
+          
+          // v2.8.0: Notizen setzen wenn vorhanden
+          if (Object.keys(formattedNotes).length > 0) {
+            setCourseNotes(formattedNotes);
+            console.log(`📝 Notizen aus Batch geladen:`, Object.keys(formattedNotes).length, 'Kurse');
+          }
+          
           console.log(`📥 Weekly Assignments geladen für KW ${weekNum}/${year}`);
 
-          // ✅ NEU: Wenn Kurse ohne Assignments gefunden wurden, speichere Defaults
+          // Wenn Kurse ohne Assignments gefunden wurden, speichere Defaults
           if (coursesWithoutAssignments.length > 0) {
             console.log(`💡 ${coursesWithoutAssignments.length} Kurse ohne Assignments gefunden - speichere Defaults...`);
             
-            // Speichere die Defaults sofort
             for (const courseId of coursesWithoutAssignments) {
               const course = courses.find(c => c.id === courseId);
               if (course && course.assignedTrainerIds?.length > 0) {
@@ -215,6 +226,174 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   }, [selectedWeek, courses.length]);
 
+  // =====================================================
+  // ✅ NEU v2.8.0: Notizen werden jetzt mit weekly-assignments geladen!
+  // Das Backend liefert sie im batch-Endpoint mit.
+  // Separater Load nur als Fallback.
+  // =====================================================
+  useEffect(() => {
+    const loadWeekNotes = async () => {
+      // Nur laden wenn courseNotes leer ist (Fallback)
+      if (Object.keys(courseNotes).length > 0) return;
+      
+      try {
+        const response = await fetch(
+          `${API_URL}/notes/week?week=${weekNumber}&year=${year}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setCourseNotes(data.grouped || {});
+          console.log(`📝 Notizen geladen für KW ${weekNumber}/${year}:`, Object.keys(data.grouped || {}).length, 'Kurse mit Notizen');
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Notizen:', error);
+      }
+    };
+
+    loadWeekNotes();
+  }, [weekNumber, year]);
+
+  // =====================================================
+  // ✅ NEU v2.8.0: Notiz-Modal öffnen (neu/bearbeiten)
+  // =====================================================
+  const openNoteModal = (course, note = null) => {
+    setNoteModalCourse(course);
+    setNoteModalNote(note);
+    setNoteModalOpen(true);
+  };
+
+  const closeNoteModal = () => {
+    setNoteModalOpen(false);
+    setNoteModalCourse(null);
+    setNoteModalNote(null);
+  };
+
+  // =====================================================
+  // ✅ NEU v2.8.0: Notiz speichern (neu oder update)
+  // =====================================================
+  const handleSaveNote = async (noteData) => {
+    if (!noteModalCourse) return;
+
+    const courseId = noteModalCourse.id;
+    const isEditing = noteData.id != null;
+
+    try {
+      let response;
+      
+      if (isEditing) {
+        // Update bestehende Notiz
+        response = await fetch(`${API_URL}/notes/${noteData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            note_type: noteData.note_type,
+            note: noteData.note
+          })
+        });
+      } else {
+        // Neue Notiz erstellen
+        response = await fetch(`${API_URL}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            course_id: courseId,
+            week: weekNumber,
+            year: year,
+            note_type: noteData.note_type,
+            note: noteData.note
+          })
+        });
+      }
+
+      if (response.ok) {
+        const savedNote = await response.json();
+        
+        // State aktualisieren
+        setCourseNotes(prev => {
+          const currentNotes = [...(prev[courseId] || [])];
+          
+          if (isEditing) {
+            // Ersetze die bearbeitete Notiz
+            const index = currentNotes.findIndex(n => n.id === noteData.id);
+            if (index !== -1) {
+              currentNotes[index] = savedNote;
+            }
+          } else {
+            // Füge neue Notiz hinzu
+            currentNotes.push(savedNote);
+          }
+          
+          return {
+            ...prev,
+            [courseId]: currentNotes
+          };
+        });
+
+        console.log(`📝 Notiz ${isEditing ? 'aktualisiert' : 'erstellt'}: ${savedNote.id}`);
+      }
+    } catch (error) {
+      console.error('Fehler beim Speichern der Notiz:', error);
+    }
+
+    closeNoteModal();
+  };
+
+  // =====================================================
+  // ✅ NEU v2.8.0: Notiz löschen
+  // =====================================================
+  const handleDeleteNote = async (noteId) => {
+    if (!noteModalCourse) return;
+
+    const courseId = noteModalCourse.id;
+
+    try {
+      const response = await fetch(`${API_URL}/notes/${noteId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // State aktualisieren
+        setCourseNotes(prev => {
+          const currentNotes = (prev[courseId] || []).filter(n => n.id !== noteId);
+          
+          return {
+            ...prev,
+            [courseId]: currentNotes
+          };
+        });
+
+        console.log(`🗑️ Notiz gelöscht: ${noteId}`);
+      }
+    } catch (error) {
+      console.error('Fehler beim Löschen der Notiz:', error);
+    }
+
+    closeNoteModal();
+  };
+
+  // Direkt löschen ohne Modal (aus der Liste)
+  const handleDeleteNoteDirectly = async (courseId, noteId) => {
+    try {
+      const response = await fetch(`${API_URL}/notes/${noteId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setCourseNotes(prev => {
+          const currentNotes = (prev[courseId] || []).filter(n => n.id !== noteId);
+          return {
+            ...prev,
+            [courseId]: currentNotes
+          };
+        });
+        console.log(`🗑️ Notiz gelöscht: ${noteId}`);
+      }
+    } catch (error) {
+      console.error('Fehler beim Löschen der Notiz:', error);
+    }
+  };
+
   // v2.3.4: Auto-Save - speichere alle Änderungen sofort
   useEffect(() => {
     const saveWeeklyAssignments = async () => {
@@ -234,9 +413,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
       try {
         for (const [courseId, trainerIds] of Object.entries(currentWeekAssignments)) {
-          const key = `${courseId}-${weekNum}-${year}`;
-          const note = courseNotes[key] || null;
-          
           console.log(`📤 Speichere Kurs ${courseId} KW ${weekNum}/${year}: [${trainerIds.join(', ')}]`);
 
           await fetch(`${API_URL}/weekly-assignments`, {
@@ -246,8 +422,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
               course_id: parseInt(courseId),
               week_number: weekNum,
               year: year,
-              trainer_ids: trainerIds,
-              note: note  // ✅ NEU: Notiz mitsenden
+              trainer_ids: trainerIds
             })
           });
         }
@@ -266,56 +441,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
     return () => clearTimeout(timeoutId);
   }, [weeklyAssignments]);
-
-  // ✅ NEU v2.5.0: Notiz speichern
-  const saveNote = async (courseId) => {
-    const key = `${courseId}-${weekNumber}-${year}`;
-    const trimmedNote = noteText.trim();
-    
-    try {
-      await fetch(`${API_URL}/weekly-assignments/note`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          course_id: courseId,
-          week_number: weekNumber,
-          year: year,
-          note: trimmedNote || null
-        })
-      });
-
-      // State aktualisieren
-      setCourseNotes(prev => {
-        const newNotes = { ...prev };
-        if (trimmedNote) {
-          newNotes[key] = trimmedNote;
-        } else {
-          delete newNotes[key];
-        }
-        return newNotes;
-      });
-
-      console.log(`📝 Notiz gespeichert für Kurs ${courseId}: "${trimmedNote}"`);
-    } catch (error) {
-      console.error('Fehler beim Speichern der Notiz:', error);
-    }
-
-    setEditingNoteId(null);
-    setNoteText('');
-  };
-
-  // ✅ NEU v2.5.0: Notiz-Bearbeitung starten
-  const startEditNote = (courseId) => {
-    const key = `${courseId}-${weekNumber}-${year}`;
-    setEditingNoteId(courseId);
-    setNoteText(courseNotes[key] || '');
-  };
-
-  // ✅ NEU v2.5.0: Notiz-Bearbeitung abbrechen
-  const cancelEditNote = () => {
-    setEditingNoteId(null);
-    setNoteText('');
-  };
 
   // Cancelled Courses vom Server laden
   useEffect(() => {
@@ -399,204 +524,99 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     if (!start || !end) return 1;
     const [startH, startM] = start.split(':').map(Number);
     const [endH, endM] = end.split(':').map(Number);
-    return (endH + endM / 60) - (startH + startM / 60);
+    return ((endH * 60 + endM) - (startH * 60 + startM)) / 60;
   };
 
-  // v2.2.0: Finale Erfassung einer Woche mit Differenz-Logik
-  const finalizeWeek = async (weekNum, yearNum) => {
-    console.log(`📝 Finalisiere KW ${weekNum}/${yearNum}...`);
+  const getStaffingStatus = (course) => {
+    const assigned = getWeeklyTrainers(course).length;
+    const required = course.requiredTrainers || course.required_trainers || 2;
 
-    try {
-      const response = await fetch(`${API_URL}/training-sessions/finalize-week`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          weekNumber: weekNum,
-          year: yearNum
-        })
-      });
+    if (assigned === 0) return { color: 'red', message: 'Keine Trainer' };
+    if (assigned < required) return { color: 'yellow', message: `${assigned}/${required} Trainer` };
+    if (assigned === required) return { color: 'green', message: 'Optimal besetzt' };
+    return { color: 'blue', message: `${assigned}/${required} Trainer (überbesetzt)` };
+  };
 
-      const result = await response.json();
+  const getTrainerName = (trainerId) => {
+    const trainer = trainers.find(t => t.id === trainerId);
+    if (!trainer) return 'Unbekannter Trainer';
+    const firstName = trainer.firstName || trainer.first_name || '';
+    const lastName = trainer.lastName || trainer.last_name || '';
+    return `${firstName} ${lastName}`.trim() || 'Unbekannter Trainer';
+  };
 
-      if (result.success) {
-        console.log(`✅ Änderungen gespeichert: +${result.changes.added} | -${result.changes.deleted}`);
-        console.log(`📊 Total: ${result.changes.totalSessions} Sessions (${result.changes.totalHours}h)`);
-
-        if (result.details && result.details.length > 0) {
-          console.table(result.details);
-        }
-
-        // Update Status nach Speicherung
-        setWeekStatus({
-          weekSaved: result.changes.totalSessions > 0,
-          sessionCount: result.changes.totalSessions,
-          totalHours: result.changes.totalHours
-        });
-
-        return result.changes;
+  const toggleCourseExpansion = (courseId) => {
+    setExpandedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) {
+        next.delete(courseId);
       } else {
-        console.log(`ℹ️ Keine Änderungen für KW ${weekNum}/${yearNum}`);
-        return { added: 0, deleted: 0, totalSessions: 0 };
+        next.add(courseId);
       }
-    } catch (error) {
-      console.error('Fehler bei Finalisierung:', error);
-      alert('Fehler beim Erfassen der Stunden!');
-      return { added: 0, deleted: 0, totalSessions: 0 };
-    }
-  };
-
-  // v2.2.0: Woche wechseln mit Finalisierung
-  const changeWeek = async (direction) => {
-    // v2.3.5: Schließe alle offenen Kurse BEVOR Woche wechselt
-    setExpandedCourses(new Set());
-    // ✅ NEU: Notiz-Editor schließen beim Wochenwechsel
-    setEditingNoteId(null);
-    setNoteText('');
-
-    // Zur neuen Woche wechseln
-    const newDate = new Date(currentWeek);
-    newDate.setDate(newDate.getDate() + (direction * 7));
-    setCurrentWeek(newDate);
-  };
-
-  // Datum-Funktionen
-  const getDateForCourse = (dayOfWeek) => {
-    const date = new Date(currentWeek);
-    const currentDay = date.getDay() || 7;
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - currentDay + 1);
-
-    const dayIndex = {
-      'Montag': 0, 'Dienstag': 1, 'Mittwoch': 2,
-      'Donnerstag': 3, 'Freitag': 4, 'Samstag': 5, 'Sonntag': 6
-    };
-
-    const courseDate = new Date(monday);
-    courseDate.setDate(monday.getDate() + (dayIndex[dayOfWeek] || 0));
-
-    return courseDate;
-  };
-
-  // v2.4.2: Gruppiere Aktivitäten nach Datum und Titel
-  const getGroupedActivities = () => {
-    const grouped = weekActivities.reduce((acc, activity) => {
-      const key = `${activity.date}_${activity.title}`;
-      if (!acc[key]) {
-        acc[key] = {
-          ...activity,
-          trainers: []
-        };
-      }
-      acc[key].trainers.push({
-        id: activity.trainer_id,
-        hours: activity.hours
-      });
-      return acc;
-    }, {});
-    return Object.values(grouped);
-  };
-
-  // v2.4.2: Hole Aktivitäten für einen bestimmten Wochentag
-  const getActivitiesForDay = (dayOfWeek) => {
-    const groupedActivities = getGroupedActivities();
-
-    return groupedActivities.filter(activity => {
-      return (activity.day_of_week || '').toLowerCase() === dayOfWeek.toLowerCase();
+      return next;
     });
   };
 
-  // v2.4.2: Hole Aktivitäts-Typ Label
-  const getActivityTypeLabel = (type, customType) => {
-    const types = {
-      'ferienspass': 'Ferienspaß',
-      'vereinsfest': 'Vereinsfest',
-      'workshop': 'Workshop',
-      'fortbildung': 'Fortbildung',
-      'sonstiges': customType || 'Sonstiges'
-    };
-    return types[type] || type;
+  const isCourseCancel = (courseId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    return cancelledCourses.has(key) || (isHolidayWeek() && !hasCourseException(courseId));
   };
 
-  // v2.4.5: Prüfe ob Kurs eine Ausnahme hat (findet trotz Ferien statt)
   const hasCourseException = (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
     return courseExceptions.has(key);
   };
 
-  const formatDate = (date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
-  };
-
-  // Ausfall-Funktionen
-  const isCourseCancel = (courseId) => {
+  const toggleCourseCancellation = async (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
-    const isHoliday = holidayWeeks.has(`${weekNumber}-${year}`);
-
-    // v2.4.5: Wenn Ferienwoche UND Kurs hat Exception → Findet statt!
-    if (isHoliday && hasCourseException(courseId)) {
-      return false;
-    }
-
-    return cancelledCourses.has(key) || isHoliday;
-  };
-
-  const toggleCourseCancellation = async (courseId, reason = 'Sonstiges') => {
-    const key = `${courseId}-${weekNumber}-${year}`;
+    const isCurrentlyCancelled = cancelledCourses.has(key);
 
     try {
-      if (cancelledCourses.has(key)) {
-        const response = await fetch(`${API_URL}/cancelled-courses?course_id=${courseId}&week_number=${weekNumber}&year=${year}`, {
+      if (isCurrentlyCancelled) {
+        await fetch(`${API_URL}/cancelled-courses/${courseId}/${weekNumber}/${year}`, {
           method: 'DELETE'
         });
-
-        if (response.ok) {
-          const newCancelled = new Set(cancelledCourses);
-          newCancelled.delete(key);
-          setCancelledCourses(newCancelled);
-        }
+        setCancelledCourses(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
       } else {
-        const response = await fetch(`${API_URL}/cancelled-courses`, {
+        await fetch(`${API_URL}/cancelled-courses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             course_id: courseId,
             week_number: weekNumber,
-            year: year,
-            reason: reason
+            year: year
           })
         });
-
-        if (response.ok) {
-          const newCancelled = new Set(cancelledCourses);
-          newCancelled.add(key);
-          setCancelledCourses(newCancelled);
-        }
+        setCancelledCourses(prev => {
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
       }
     } catch (error) {
-      console.error('Fehler beim Umschalten des Ausfalls:', error);
+      console.error('Fehler beim Ändern des Kurs-Status:', error);
     }
   };
 
-  // v2.4.5: Course Exception Toggle (Kurs findet trotz Ferien statt)
   const toggleCourseException = async (courseId) => {
     const key = `${courseId}-${weekNumber}-${year}`;
+    const hasException = courseExceptions.has(key);
 
     try {
-      if (courseExceptions.has(key)) {
-        // Ausnahme entfernen
+      if (hasException) {
         await fetch(`${API_URL}/course-exceptions/${courseId}/${weekNumber}/${year}`, {
           method: 'DELETE'
         });
-
-        const newExceptions = new Set(courseExceptions);
-        newExceptions.delete(key);
-        setCourseExceptions(newExceptions);
-        console.log(`🗑️ Kurs-Ausnahme entfernt: ${courseId}`);
+        setCourseExceptions(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
       } else {
-        // Ausnahme hinzufügen
         await fetch(`${API_URL}/course-exceptions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -606,15 +626,79 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             year: year
           })
         });
-
-        const newExceptions = new Set(courseExceptions);
-        newExceptions.add(key);
-        setCourseExceptions(newExceptions);
-        console.log(`✅ Kurs-Ausnahme hinzugefügt: ${courseId}`);
+        setCourseExceptions(prev => {
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
       }
     } catch (error) {
-      console.error('Fehler beim Umschalten der Kurs-Ausnahme:', error);
+      console.error('Fehler beim Ändern der Kurs-Ausnahme:', error);
     }
+  };
+
+  const addTrainerToCourse = (courseId, trainerId) => {
+    if (!trainerId) return;
+    const key = `${courseId}-${weekNumber}-${year}`;
+    const currentTrainers = weeklyAssignments[key] || 
+      (courses.find(c => c.id === courseId)?.assignedTrainerIds || []);
+    
+    if (!currentTrainers.includes(parseInt(trainerId))) {
+      setWeeklyAssignments(prev => ({
+        ...prev,
+        [key]: [...currentTrainers, parseInt(trainerId)]
+      }));
+    }
+  };
+
+  const removeTrainerFromCourse = (courseId, trainerId) => {
+    const key = `${courseId}-${weekNumber}-${year}`;
+    const currentTrainers = weeklyAssignments[key] || 
+      (courses.find(c => c.id === courseId)?.assignedTrainerIds || []);
+    
+    setWeeklyAssignments(prev => ({
+      ...prev,
+      [key]: currentTrainers.filter(id => id !== trainerId)
+    }));
+  };
+
+  // Woche navigieren
+  const navigateWeek = (direction) => {
+    setCurrentWeek(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + (direction * 7));
+      return newDate;
+    });
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeek(new Date());
+  };
+
+  // Formatiere Datum
+  const formatDate = (date) => {
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  };
+
+  // Hole Datum für einen Wochentag
+  const getDateForCourse = (dayName) => {
+    const dayIndex = daysOfWeek.indexOf(dayName);
+    const date = new Date(currentWeek);
+    const currentDayIndex = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - currentDayIndex + dayIndex);
+    return date;
+  };
+
+  // Monats-Header generieren
+  const getWeekDateRange = () => {
+    const date = new Date(currentWeek);
+    const currentDay = date.getDay() || 7;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - currentDay + 1);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    return `${formatDate(monday)} - ${formatDate(sunday)}`;
   };
 
   // Ferienwoche Toggle
@@ -654,91 +738,58 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     }
   };
 
-  // Trainer-Funktionen
-  const addTrainerToCourse = (courseId, trainerId) => {
-    if (!trainerId) return;
-
-    const key = `${courseId}-${weekNumber}-${year}`;
-    const currentTrainers = weeklyAssignments[key] ||
-      courses.find(c => c.id === courseId)?.assignedTrainerIds || [];
-
-    if (!currentTrainers.includes(parseInt(trainerId))) {
-      setWeeklyAssignments(prev => ({
-        ...prev,
-        [key]: [...currentTrainers, parseInt(trainerId)]
-      }));
-    }
+  // Aktivitätstyp-Label
+  const getActivityTypeLabel = (type, customType) => {
+    const labels = {
+      'wettkampf': '🏆 Wettkampf',
+      'fortbildung': '📚 Fortbildung',
+      'workshop': '🎯 Workshop',
+      'sonstiges': customType ? `✨ ${customType}` : '✨ Sonstiges'
+    };
+    return labels[type] || type;
   };
 
-  const removeTrainerFromCourse = (courseId, trainerId) => {
-    const key = `${courseId}-${weekNumber}-${year}`;
-    const currentTrainers = weeklyAssignments[key] ||
-      courses.find(c => c.id === courseId)?.assignedTrainerIds || [];
+  // Filtere Kurse nach Tag
+  const filteredCourses = selectedDay === 'Alle'
+    ? courses
+    : courses.filter(c => (c.dayOfWeek || c.day_of_week) === selectedDay);
 
-    setWeeklyAssignments(prev => ({
-      ...prev,
-      [key]: currentTrainers.filter(id => id !== parseInt(trainerId))
-    }));
-  };
+  // Gruppiere nach Wochentagen
+  const coursesByDay = daysOfWeek.reduce((acc, day) => {
+    acc[day] = filteredCourses.filter(c => (c.dayOfWeek || c.day_of_week) === day);
+    return acc;
+  }, {});
 
-  // Kurs-Erweiterung Toggle
-  const toggleCourseExpansion = (courseId) => {
-    const newExpanded = new Set(expandedCourses);
-    if (newExpanded.has(courseId)) {
-      newExpanded.delete(courseId);
-    } else {
-      newExpanded.add(courseId);
-    }
-    setExpandedCourses(newExpanded);
-  };
-
-  // Trainer-Name holen
-  const getTrainerName = (trainerId) => {
-    const trainer = trainers.find(t => t.id === trainerId);
-    if (!trainer) return 'Unbekannter Trainer';
-
-    const firstName = trainer.firstName || trainer.first_name || '';
-    const lastName = trainer.lastName || trainer.last_name || '';
-    return `${firstName} ${lastName}`.trim();
-  };
-
-  // Besetzungs-Status berechnen
-  const getStaffingStatus = (course) => {
-    const assigned = getWeeklyTrainers(course).length;
-    const required = course.requiredTrainers || course.required_trainers || 2;
-
-    if (assigned === 0) return { color: 'red', message: 'Nicht besetzt' };
-    if (assigned < required) return { color: 'yellow', message: `${assigned}/${required} Trainer` };
-    if (assigned === required) return { color: 'green', message: 'Optimal besetzt' };
-    return { color: 'blue', message: `Überbesetzt (${assigned}/${required})` };
-  };
-
-  // Kurse filtern
-  const filteredCourses = courses.filter(course => {
-    if (selectedDay === 'Alle') return true;
-    return (course.dayOfWeek || course.day_of_week) === selectedDay;
-  });
-
-  // Monats-Header generieren
-  const getWeekDateRange = () => {
-    const date = new Date(currentWeek);
-    const currentDay = date.getDay() || 7;
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - currentDay + 1);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-
-    return `${formatDate(monday)} - ${formatDate(sunday)}`;
-  };
+  // Gruppiere Aktivitäten nach Wochentagen
+  const activitiesByDay = daysOfWeek.reduce((acc, day) => {
+    acc[day] = weekActivities.filter(a => {
+      const actDate = new Date(a.date);
+      const actDayName = daysOfWeek[(actDate.getDay() + 6) % 7];
+      return actDayName === day;
+    });
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-4">
+      {/* =====================================================
+          NOTE MODAL
+          ===================================================== */}
+      <NoteModal
+        isOpen={noteModalOpen}
+        onClose={closeNoteModal}
+        onSave={handleSaveNote}
+        onDelete={handleDeleteNote}
+        note={noteModalNote}
+        courseName={noteModalCourse?.name || ''}
+      />
+
       {/* Header mit KW-Navigation */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => changeWeek(-1)}
+              onClick={() => navigateWeek(-1)}
               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
               title="Vorherige Woche"
             >
@@ -755,7 +806,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             </div>
 
             <button
-              onClick={() => changeWeek(1)}
+              onClick={() => navigateWeek(1)}
               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
               title="Nächste Woche"
             >
@@ -765,7 +816,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setCurrentWeek(new Date())}
+              onClick={goToCurrentWeek}
               className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200"
             >
               Heute
@@ -825,28 +876,23 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         </select>
       </div>
 
-      {/* Kursliste - Gruppiert nach Tagen */}
+      {/* Kurse nach Tagen */}
       <div className="space-y-6">
         {(() => {
           const daysToShow = selectedDay === 'Alle' ? daysOfWeek : [selectedDay];
-
+          
           return daysToShow.map(day => {
-            const dayCourses = filteredCourses.filter(course =>
-              (course.dayOfWeek || course.day_of_week) === day
-            );
-
-            const dayActivities = getActivitiesForDay(day);
-
-            if (dayCourses.length === 0 && dayActivities.length === 0) {
-              return null;
-            }
+            const dayCourses = coursesByDay[day] || [];
+            const dayActivities = activitiesByDay[day] || [];
+            
+            if (dayCourses.length === 0 && dayActivities.length === 0) return null;
 
             return (
               <div key={day} className="space-y-3">
                 {/* Tages-Header */}
-                <div className="border-b-2 border-red-600 pb-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-red-600" />
+                <div className="bg-gray-100 rounded-lg p-3 sm:p-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-gray-600" />
                     <div>
                       <h3 className="font-bold text-gray-900 text-xl">{day}</h3>
                       <span className="text-gray-500 text-sm">{formatDate(getDateForCourse(day))}</span>
@@ -858,7 +904,7 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 {dayCourses.map(course => {
                   const isExpanded = expandedCourses.has(course.id);
                   const status = getStaffingStatus(course);
-                  const courseNote = getCourseNote(course.id);
+                  const notes = getCourseNotes(course.id);  // ← NEU: Array!
                   const bgColor = isCourseCancel(course.id)
                     ? 'bg-gray-100 border-gray-400 opacity-60'
                     : status.color === 'red' ? 'bg-red-50 border-red-300' :
@@ -925,8 +971,14 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                                 }
                               </button>
                               <div className="flex-1">
-                                <div className="font-bold text-gray-900 text-sm sm:text-base">
-                                  {course.startTime || course.start_time || '?'}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-gray-900 text-sm sm:text-base">
+                                    {course.startTime || course.start_time || '?'}
+                                  </span>
+                                  {/* =====================================================
+                                      ✅ NEU: NOTIZEN-BADGES (zugeklappt)
+                                      ===================================================== */}
+                                  <NotesBadges notes={notes} />
                                 </div>
                                 <div className="font-medium text-gray-800 text-base sm:text-lg mt-1">
                                   {course.name}
@@ -984,52 +1036,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                             })()}
                           </div>
                         </div>
-
-                        {/* ✅ NEU: NOTIZ-ANZEIGE (immer sichtbar wenn vorhanden) */}
-                        {courseNote && editingNoteId !== course.id && (
-                          <div
-                            className="mt-3 ml-8 p-2 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors"
-                            onClick={() => startEditNote(course.id)}
-                          >
-                            <div className="flex items-start gap-2">
-                              <MessageSquare className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                              <p className="text-sm text-amber-800 flex-1">{courseNote}</p>
-                              <Edit3 className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* ✅ NEU: NOTIZ-EDITOR (wenn Bearbeitung aktiv) */}
-                        {editingNoteId === course.id && (
-                          <div className="mt-3 ml-8 p-3 bg-amber-50 border border-amber-300 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <MessageSquare className="w-4 h-4 text-amber-600" />
-                              <span className="text-sm font-medium text-amber-800">Notiz bearbeiten</span>
-                            </div>
-                            <textarea
-                              className="w-full p-2 border border-amber-300 rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
-                              rows="2"
-                              placeholder="z.B. Neue TN: Lisa M. (4 Jahre), Max S. (5 Jahre)"
-                              value={noteText}
-                              onChange={(e) => setNoteText(e.target.value)}
-                              autoFocus
-                            />
-                            <div className="flex justify-end gap-2 mt-2">
-                              <button
-                                onClick={cancelEditNote}
-                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                              >
-                                Abbrechen
-                              </button>
-                              <button
-                                onClick={() => saveNote(course.id)}
-                                className="px-3 py-1 text-sm bg-amber-500 text-white rounded hover:bg-amber-600"
-                              >
-                                Speichern
-                              </button>
-                            </div>
-                          </div>
-                        )}
 
                         {/* Aufgeklappter Bereich */}
                         {isExpanded && (
@@ -1101,16 +1107,15 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                                 ✓ = Verfügbar am {course.dayOfWeek || course.day_of_week}
                               </p>
 
-                              {/* ✅ NEU: Notiz hinzufügen Button (wenn keine Notiz vorhanden) */}
-                              {!courseNote && editingNoteId !== course.id && (
-                                <button
-                                  onClick={() => startEditNote(course.id)}
-                                  className="mt-3 w-full py-2 px-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
-                                >
-                                  <MessageSquare className="w-4 h-4" />
-                                  <span>Notiz hinzufügen (z.B. neue Teilnehmer)</span>
-                                </button>
-                              )}
+                              {/* =====================================================
+                                  ✅ NEU v2.8.0: NOTIZEN-LISTE (aufgeklappt)
+                                  ===================================================== */}
+                              <NotesList
+                                notes={notes}
+                                onAddNote={() => openNoteModal(course, null)}
+                                onEditNote={(note) => openNoteModal(course, note)}
+                                onDeleteNote={(noteId) => handleDeleteNoteDirectly(course.id, noteId)}
+                              />
 
                               {/* Kurs ausfallen lassen */}
                               <div className="mt-4 pt-4 border-t">
@@ -1217,6 +1222,19 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
           <div className="flex items-center gap-1 sm:gap-2">
             <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-100 border border-blue-300 rounded"></div>
             <span>Überbesetzt</span>
+          </div>
+        </div>
+        {/* NEU: Notizen-Legende */}
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="flex flex-wrap gap-4 text-xs sm:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">🔒1</span>
+              <span>Interne Notiz (nur Trainer)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">📢1</span>
+              <span>Öffentliche Notiz (für Eltern)</span>
+            </div>
           </div>
         </div>
       </div>
