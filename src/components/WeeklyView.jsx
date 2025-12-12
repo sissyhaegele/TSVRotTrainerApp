@@ -233,8 +233,12 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // =====================================================
   useEffect(() => {
     const loadWeekNotes = async () => {
-      // WICHTIG: Erst alte Notizen leeren bei Wochenwechsel!
+      // WICHTIG: Bei Wochenwechsel alles zurücksetzen!
       setCourseNotes({});
+      setExpandedCourses(new Set());
+      setNoteModalOpen(false);
+      setNoteModalCourse(null);
+      setNoteModalNote(null);
       
       try {
         const response = await fetch(
