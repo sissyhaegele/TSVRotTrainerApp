@@ -60,11 +60,7 @@ export default function NotesList({
                             key={note.id} 
                             note={note} 
                             onEdit={() => onEditNote(note)}
-                            onDelete={() => {
-                                if (confirm('Notiz wirklich löschen?')) {
-                                    onDeleteNote(note.id);
-                                }
-                            }}
+                            onDelete={() => onDeleteNote(note.id)}
                         />
                     ))}
                 </div>

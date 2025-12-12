@@ -17,7 +17,6 @@ export default function NoteModal({
 }) {
     const [noteType, setNoteType] = useState('internal');
     const [noteText, setNoteText] = useState('');
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     
     // Bei Bearbeitung: Felder vorausfüllen
     useEffect(() => {
@@ -28,7 +27,6 @@ export default function NoteModal({
             setNoteType('internal');
             setNoteText('');
         }
-        setShowDeleteConfirm(false);
     }, [note, isOpen]);
     
     if (!isOpen) return null;
@@ -47,11 +45,7 @@ export default function NoteModal({
     };
     
     const handleDelete = () => {
-        if (showDeleteConfirm) {
-            onDelete(note.id);
-        } else {
-            setShowDeleteConfirm(true);
-        }
+        onDelete(note.id);
     };
 
     const handleBackdropClick = (e) => {
@@ -186,14 +180,10 @@ export default function NoteModal({
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                                    showDeleteConfirm
-                                        ? 'bg-red-600 text-white hover:bg-red-700'
-                                        : 'text-red-600 hover:bg-red-50'
-                                }`}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-red-600 hover:bg-red-50"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                {showDeleteConfirm ? 'Wirklich löschen?' : 'Löschen'}
+                                Löschen
                             </button>
                         )}
                     </div>
