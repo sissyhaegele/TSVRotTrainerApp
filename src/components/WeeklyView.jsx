@@ -233,8 +233,8 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // =====================================================
   useEffect(() => {
     const loadWeekNotes = async () => {
-      // Nur laden wenn courseNotes leer ist (Fallback)
-      if (Object.keys(courseNotes).length > 0) return;
+      // WICHTIG: Erst alte Notizen leeren bei Wochenwechsel!
+      setCourseNotes({});
       
       try {
         const response = await fetch(
