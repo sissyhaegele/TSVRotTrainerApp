@@ -943,43 +943,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         )}
       </div>
 
-      {/* ✅ FIX v2.12.1: Sonderaktivitäten-Übersicht - IMMER sichtbar, auch bei Ferien */}
-      {weeklyActivities.length > 0 && isHolidayWeek() && (
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg shadow p-4 border-2 border-purple-200">
-          <h3 className="font-bold text-purple-900 text-lg mb-3 flex items-center gap-2">
-            🎯 Sonderaktivitäten in dieser Ferienwoche
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {weeklyActivities.map(activity => (
-              <div
-                key={`overview-activity-${activity.id}`}
-                className="bg-white rounded-lg p-3 border border-purple-200 shadow-sm"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{getActivityIcon(activity.activity_type)}</span>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-purple-900">{activity.title}</h4>
-                    <p className="text-sm text-gray-600">
-                      {activity.day_of_week || activity.dayOfWeek} • {activity.hours}h
-                    </p>
-                    {activity.trainer_names && (
-                      <p className="text-xs text-gray-500 mt-1">👤 {activity.trainer_names}</p>
-                    )}
-                    <span className={`inline-block mt-2 text-xs px-2 py-0.5 rounded-full ${
-                      activity.visibility === 'public' 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {activity.visibility === 'public' ? '📢 Für Eltern' : '🔒 Intern'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Filter */}
       <div className="mb-4 flex justify-end">
         <select
@@ -1295,8 +1258,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                     
                     {activity.trainer_names && (
                       <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                        <span>👤</span>
-                        <span>{activity.trainer_names}</span>
+                        <span>{activity.trainer_count > 1 ? '👥' : '👤'}</span>
+                        <span>
+                          {activity.trainer_count > 1 && `${activity.trainer_count} Trainer: `}
+                          {activity.trainer_names}
+                        </span>
                       </div>
                     )}
                     
