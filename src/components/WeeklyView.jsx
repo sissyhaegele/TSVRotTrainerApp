@@ -27,6 +27,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
   // v2.4.2: Außerplanmäßige Aktivitäten der Woche
   const [weekActivities, setWeekActivities] = useState([]);
 
+  // ✅ NEU v2.12.0: Sonderaktivitäten mit visibility
+  const [weeklyActivities, setWeeklyActivities] = useState([]);
+
   // v2.4.5: Course Exceptions (Ferien-Override)
   const [courseExceptions, setCourseExceptions] = useState(new Set());
 
@@ -90,6 +93,35 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     });
   };
 
+  // ✅ NEU v2.12.0: Datum für einen Wochentag berechnen
+  const getDayOfWeek = (weekDate, dayIndex) => {
+    const d = new Date(weekDate);
+    const day = d.getDay() || 7; // Sonntag = 7
+    const diff = d.getDate() - day + (dayIndex + 1); // +1 weil Montag = 0
+    return new Date(d.setDate(diff));
+  };
+
+  // ✅ NEU v2.12.0: Activities für einen Tag holen
+  const getActivitiesForDay = (dayIndex) => {
+    const date = getDayOfWeek(currentWeek, dayIndex);
+    const dateStr = date.toISOString().split('T')[0];
+    return weeklyActivities.filter(activity => 
+      activity.date?.split('T')[0] === dateStr
+    );
+  };
+
+  // ✅ NEU v2.12.0: Icon für Activity-Typ
+  const getActivityIcon = (activityType) => {
+    const icons = {
+      'ferienspass': '🎉',
+      'vereinsfest': '🎪',
+      'workshop': '🔧',
+      'fortbildung': '📚',
+      'sonstiges': '📋'
+    };
+    return icons[activityType] || '🎯';
+  };
+
   // Prüfe ob es eine Ferienwoche ist
   const isHolidayWeek = () => {
     return holidayWeeks.has(`${weekNumber}-${year}`);
@@ -135,7 +167,27 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
       }
     };
 
+    // ✅ NEU v2.12.0: Sonderaktivitäten laden
+    const fetchWeeklyActivities = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/weekly-activities/${year}/${weekNumber}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setWeeklyActivities(data);
+          console.log(`🎯 Activities geladen für KW ${weekNumber}/${year}:`, data.length);
+        }
+      } catch (error) {
+        console.error('Error fetching weekly activities:', error);
+      }
+    };
+
     loadWeekStatus();
+    fetchWeeklyActivities();
   }, [weekNumber, year]);
 
   // v2.3.4: Weekly Assignments für ALLE sichtbaren Kurse laden
@@ -764,13 +816,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
     return acc;
   }, {});
 
-  // Gruppiere Aktivitäten nach Wochentagen
-  const activitiesByDay = daysOfWeek.reduce((acc, day) => {
-    acc[day] = weekActivities.filter(a => {
-      const actDate = new Date(a.date);
-      const actDayName = daysOfWeek[(actDate.getDay() + 6) % 7];
-      return actDayName === day;
-    });
+  // ✅ NEU v2.12.0: Gruppiere Sonderaktivitäten nach Wochentagen
+  const activitiesByDay = daysOfWeek.reduce((acc, day, dayIndex) => {
+    acc[day] = getActivitiesForDay(dayIndex);
     return acc;
   }, {});
 
@@ -1156,52 +1204,60 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                   );
                 })}
 
-                {/* Aktivitäten für diesen Tag */}
-                {dayActivities.map((activity, actIdx) => {
-                  const activityTypeLabel = getActivityTypeLabel(activity.activity_type, activity.custom_type);
-                  const trainerCount = activity.trainers.length;
-                  const trainerNames = activity.trainers
-                    .map(t => getTrainerName(t.id))
-                    .filter(name => name !== 'Unbekannter Trainer')
-                    .join(', ');
-
-                  return (
-                    <div
-                      key={`activity-${activity.id}-${actIdx}`}
-                      className="border-2 border-green-400 rounded-lg bg-green-50"
-                    >
-                      <div className="p-3 sm:p-4">
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <div className="mt-1 p-1 bg-green-200 rounded-full">
-                            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="px-2 py-1 bg-green-200 text-green-800 text-xs font-medium rounded">
-                                {activityTypeLabel}
-                              </span>
-                            </div>
-                            <div className="font-bold text-gray-900 text-sm sm:text-base mb-1">
-                              {activity.hours}h · {activity.title}
-                            </div>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
-                              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="font-medium">{trainerCount} Trainer:</span>
-                              <span className="text-gray-600">{trainerNames}</span>
-                            </div>
-                          </div>
+                {/* ✅ NEU v2.12.0: Sonderaktivitäten mit visibility */}
+                {dayActivities.map(activity => (
+                  <div 
+                    key={`activity-${activity.id}`} 
+                    className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-3 shadow-sm mb-2 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-2xl">{getActivityIcon(activity.activity_type)}</span>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-sm text-purple-900">
+                            {activity.title}
+                          </h4>
+                          <p className="text-xs text-purple-600">
+                            {activity.hours} Stunden
+                          </p>
                         </div>
                       </div>
+                      <span className="text-lg ml-2">
+                        {activity.visibility === 'public' ? '📢' : '🔒'}
+                      </span>
                     </div>
-                  );
-                })}
+                    
+                    {activity.trainer_names && (
+                      <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                        <span>👤</span>
+                        <span>{activity.trainer_names}</span>
+                      </div>
+                    )}
+                    
+                    {activity.custom_type && activity.activity_type === 'sonstiges' && (
+                      <div className="text-xs text-purple-600 italic mb-1">
+                        {activity.custom_type}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 mt-2 text-xs">
+                      <span className={`px-2 py-0.5 rounded-full ${
+                        activity.visibility === 'public' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {activity.visibility === 'public' ? '📢 Für Eltern' : '🔒 Intern'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           });
         })()}
       </div>
 
-      {filteredCourses.length === 0 && weekActivities.length === 0 && (
+      {filteredCourses.length === 0 && weeklyActivities.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center text-gray-500">
           Keine Kurse oder Aktivitäten für {selectedDay === 'Alle' ? 'diese Woche' : selectedDay} vorhanden.
         </div>

@@ -34,7 +34,8 @@ export default function Activities({
     customType: '',
     title: '',
     hours: '',
-    notes: ''
+    notes: '',
+    visibility: 'internal'  // NEU: Default 'internal'
   });
 
   const activityTypes = [
@@ -80,7 +81,8 @@ export default function Activities({
       customType: '',
       title: '',
       hours: '',
-      notes: ''
+      notes: '',
+      visibility: 'internal'  // NEU
     });
     setSelectedTrainers([]);
     setEditMode(false);
@@ -104,7 +106,8 @@ export default function Activities({
       customType: activity.custom_type || '',
       title: activity.title,
       hours: activity.hours.toString(),
-      notes: activity.notes || ''
+      notes: activity.notes || '',
+      visibility: activity.visibility || 'internal'  // NEU
     });
     setSelectedTrainers(activityTrainers);
     setEditMode(true);
@@ -153,7 +156,8 @@ export default function Activities({
       title: activityForm.title,
       hours: parseFloat(activityForm.hours),
       notes: activityForm.notes || null,
-      trainerIds: selectedTrainers
+      trainerIds: selectedTrainers,
+      visibility: activityForm.visibility  // NEU
     };
 
     try {
@@ -443,6 +447,75 @@ export default function Activities({
                   disabled={loading}
                 />
               </div>
+
+              {/* NEU: Visibility Selection */}
+              <div className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Sichtbarkeit *
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-white"
+                    style={{
+                      borderColor: activityForm.visibility === 'internal' ? '#3b82f6' : '#e5e7eb',
+                      backgroundColor: activityForm.visibility === 'internal' ? '#eff6ff' : 'transparent'
+                    }}>
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="internal"
+                      checked={activityForm.visibility === 'internal'}
+                      onChange={(e) => setActivityForm({...activityForm, visibility: e.target.value})}
+                      disabled={loading}
+                      className="mt-0.5 w-4 h-4 text-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        <span>🔒</span>
+                        <span>Nur für Trainer (Intern)</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Diese Aktivität ist nur im Admin-Bereich sichtbar. Gut für: Fortbildungen, interne Meetings.
+                      </p>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-white"
+                    style={{
+                      borderColor: activityForm.visibility === 'public' ? '#3b82f6' : '#e5e7eb',
+                      backgroundColor: activityForm.visibility === 'public' ? '#eff6ff' : 'transparent'
+                    }}>
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="public"
+                      checked={activityForm.visibility === 'public'}
+                      onChange={(e) => setActivityForm({...activityForm, visibility: e.target.value})}
+                      disabled={loading}
+                      className="mt-0.5 w-4 h-4 text-blue-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        <span>📢</span>
+                        <span>Für Eltern sichtbar (Extern)</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Erscheint im öffentlichen Kursplan. Gut für: Wettkämpfe, Aufführungen, Ausflüge.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                
+                {activityForm.visibility === 'public' && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-yellow-600">⚠️</span>
+                      <p className="text-sm text-yellow-800">
+                        <strong>Hinweis:</strong> Diese Aktivität wird im öffentlichen Kursplan für alle Eltern sichtbar sein.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
@@ -490,6 +563,16 @@ export default function Activities({
                       <Tag className="w-3 h-3 mr-1" />
                       {activityTypeLabel}
                     </span>
+                    {/* NEU: Visibility Badge */}
+                    {activity.visibility === 'public' ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded flex items-center">
+                        📢 Für Eltern
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded flex items-center">
+                        🔒 Intern
+                      </span>
+                    )}
                   </div>
                   
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">

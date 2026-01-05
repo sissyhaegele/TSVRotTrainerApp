@@ -50,6 +50,9 @@ export default function PublicSchedule() {
   const [error, setError] = useState(null);
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // ✅ NEU v2.12.0: Öffentliche Sonderaktivitäten
+  const [publicActivities, setPublicActivities] = useState([]);
 
   // Daten laden
   useEffect(() => {
@@ -70,6 +73,8 @@ export default function PublicSchedule() {
         setWeekDates(data.weekDates);
         setIsHolidayWeek(data.isHolidayWeek);
         setHolidayName(data.holidayName);
+        // ✅ NEU v2.12.0: Öffentliche Activities laden
+        setPublicActivities(data.activities || []);
       } else {
         setError('Fehler beim Laden des Kursplans');
       }
@@ -102,6 +107,25 @@ export default function PublicSchedule() {
     const now = new Date();
     setWeekNumber(getISOWeekNumber(now));
     setYear(now.getFullYear());
+  };
+
+  // ✅ NEU v2.12.0: Activities für einen Tag holen
+  const getActivitiesForDay = (dayName) => {
+    return publicActivities.filter(activity => 
+      activity.day_of_week === dayName
+    );
+  };
+
+  // ✅ NEU v2.12.0: Icon für Activity-Typ
+  const getActivityIcon = (activityType) => {
+    const icons = {
+      'ferienspass': '🎉',
+      'vereinsfest': '🎪',
+      'workshop': '🔧',
+      'fortbildung': '📚',
+      'sonstiges': '📋'
+    };
+    return icons[activityType] || '🎯';
   };
 
   // Link kopieren
@@ -216,6 +240,62 @@ export default function PublicSchedule() {
               </div>
             </div>
           ))}
+          
+          {/* ✅ NEU v2.12.0: Sonderaktivitäten */}
+          {getActivitiesForDay(day).length > 0 && (
+            <div className="mt-4">
+              <div className="mb-2 pb-1 border-b border-purple-200">
+                <h4 className="text-sm font-semibold text-purple-700 flex items-center gap-1">
+                  <span>🎯</span>
+                  <span>Besondere Aktivitäten</span>
+                </h4>
+              </div>
+              
+              {getActivitiesForDay(day).map(activity => (
+                <div
+                  key={`activity-${activity.id}`}
+                  className="bg-gradient-to-r from-purple-50 via-pink-50 to-purple-50 border-2 border-purple-300 rounded-lg p-5 shadow-md mb-3 hover:shadow-lg transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="text-5xl flex-shrink-0">
+                      {getActivityIcon(activity.activity_type)}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-xl font-bold text-purple-900 mb-2">
+                        {activity.title}
+                      </h5>
+                      
+                      <div className="space-y-2 text-gray-700 mb-3">
+                        <p className="flex items-center gap-2 text-base">
+                          <span className="font-semibold">🕐</span>
+                          <span>{activity.hours} Stunden</span>
+                        </p>
+                        
+                        {activity.trainer_names && (
+                          <p className="flex items-center gap-2 text-base">
+                            <span className="font-semibold">👤</span>
+                            <span>{activity.trainer_names}</span>
+                          </p>
+                        )}
+                        
+                        {activity.custom_type && activity.activity_type === 'sonstiges' && (
+                          <p className="text-sm text-purple-700 italic">
+                            Art: {activity.custom_type}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                        <span>📢</span>
+                        <span>Besondere Aktivität</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -361,6 +441,18 @@ export default function PublicSchedule() {
                 <p className="text-amber-800 font-medium text-lg">
                   🏖️ {holidayName || 'Ferien'} - Alle Kurse fallen aus
                 </p>
+                
+                {/* ✅ NEU v2.12.0: Hinweis auf Activities */}
+                {publicActivities.length > 0 && (
+                  <div className="mt-4 p-4 bg-white rounded-lg border-2 border-purple-300">
+                    <p className="text-purple-800 font-semibold mb-2">
+                      ⚠️ Aber Achtung: In dieser Woche finden {publicActivities.length} besondere Aktivität(en) statt!
+                    </p>
+                    <p className="text-sm text-purple-700">
+                      Siehe unten für Details zu Ferienprogrammen, Workshops oder Wettkämpfen.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
