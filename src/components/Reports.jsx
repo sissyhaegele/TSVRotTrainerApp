@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function Reports() {
+export default function Reports({ apiUrl }) {
   const [activeTab, setActiveTab] = useState('yearly'); // 'yearly' or 'range'
   const [year, setYear] = useState(2025);
   const [startDate, setStartDate] = useState('');
@@ -10,7 +10,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8181';
+  const API_URL = apiUrl || 'http://localhost:8181/api';
 
   // Setze default Datumsbereich (aktueller Monat)
   useEffect(() => {

@@ -323,7 +323,7 @@ function App() {
               />
             )}
             {activeTab === 'reports' && (
-              <Reports />
+              <Reports apiUrl={API_URL} />
             )}
           </div>
         </div>
