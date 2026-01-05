@@ -33,12 +33,12 @@ export default function Reports({ apiUrl }) {
     setError(null);
 
     try {
-      const trainerResponse = await fetch(`${API_URL}/api/reports/trainer-hours?year=${year}`);
+      const trainerResponse = await fetch(`${API_URL}/reports/trainer-hours?year=${year}`);
       if (!trainerResponse.ok) throw new Error('Fehler beim Laden der Trainer-Daten');
       const trainerJson = await trainerResponse.json();
       setTrainerData(trainerJson);
 
-      const hallResponse = await fetch(`${API_URL}/api/reports/hall-usage?year=${year}`);
+      const hallResponse = await fetch(`${API_URL}/reports/hall-usage?year=${year}`);
       if (!hallResponse.ok) throw new Error('Fehler beim Laden der Hallen-Daten');
       const hallJson = await hallResponse.json();
       setHallData(hallJson);
@@ -67,14 +67,14 @@ export default function Reports({ apiUrl }) {
 
     try {
       const trainerResponse = await fetch(
-        `${API_URL}/api/reports/trainer-hours-range?start=${startDate}&end=${endDate}`
+        `${API_URL}/reports/trainer-hours-range?start=${startDate}&end=${endDate}`
       );
       if (!trainerResponse.ok) throw new Error('Fehler beim Laden der Trainer-Daten');
       const trainerJson = await trainerResponse.json();
       setTrainerData(trainerJson);
 
       const hallResponse = await fetch(
-        `${API_URL}/api/reports/hall-usage-range?start=${startDate}&end=${endDate}`
+        `${API_URL}/reports/hall-usage-range?start=${startDate}&end=${endDate}`
       );
       if (!hallResponse.ok) throw new Error('Fehler beim Laden der Hallen-Daten');
       const hallJson = await hallResponse.json();
