@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, X, Menu, LogOut, Sparkles } from 'lucide-react';
+import { Calendar, Users, X, Menu, LogOut, Sparkles, BarChart3 } from 'lucide-react';
 import WeeklyView from './components/WeeklyView';
 import Courses from './components/Courses';
 import Trainers from './components/Trainers';
 import Activities from './components/Activities';
-import PublicSchedule from './components/PublicSchedule';  // ← NEU
+import PublicSchedule from './components/PublicSchedule';
+import Reports from './components/Reports';  // ← NEU
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8181/api'
@@ -233,6 +234,18 @@ function App() {
               <Sparkles className="mr-3 h-5 w-5" />
               Aktivitäten
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('reports');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md mt-1 ${
+                activeTab === 'reports' ? 'bg-red-100 text-red-900' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 className="mr-3 h-5 w-5" />
+              Berichte
+            </button>
           </nav>
           
           {adminMode && (
@@ -308,6 +321,9 @@ function App() {
                 deleteMode={deleteMode}
                 adminMode={adminMode}
               />
+            )}
+            {activeTab === 'reports' && (
+              <Reports />
             )}
           </div>
         </div>
