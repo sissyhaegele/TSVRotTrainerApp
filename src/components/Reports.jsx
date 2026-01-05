@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export default function Reports({ apiUrl }) {
   const [activeTab, setActiveTab] = useState('yearly'); // 'yearly' or 'range'
@@ -94,6 +97,146 @@ export default function Reports({ apiUrl }) {
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  // Excel Export
+  const exportToExcel = () => {
+    if (!trainerData || !hallData) return;
+
+    const wb = XLSX.utils.book_new();
+    
+    // Trainer Sheet
+    const trainerRows = [
+      ['Trainer-Stunden ' + (activeTab === 'yearly' ? year : `${formatDate(startDate)} - ${formatDate(endDate)}`)],
+      [],
+      ['Trainer', 'Stunden', 'Wochen', 'Trainings']
+    ];
+    
+    trainerData.trainers.forEach(trainer => {
+      trainerRows.push([
+        trainer.name,
+        trainer.totalHours,
+        trainer.trainingWeeks,
+        trainer.sessionCount
+      ]);
+    });
+    
+    trainerRows.push([]);
+    trainerRows.push(['GESAMT', trainerData.summary.totalHours, '', '']);
+    
+    const trainerSheet = XLSX.utils.aoa_to_sheet(trainerRows);
+    XLSX.utils.book_append_sheet(wb, trainerSheet, 'Trainer');
+    
+    // Hallen Sheet
+    const hallenRows = [
+      ['Hallen-Auslastung ' + (activeTab === 'yearly' ? year : `${formatDate(startDate)} - ${formatDate(endDate)}`)],
+      [],
+      ['Halle', 'Stunden', 'Kurse', 'Wochen', 'Trainings']
+    ];
+    
+    hallData.halls.forEach(hall => {
+      hallenRows.push([
+        hall.location,
+        hall.totalHours,
+        hall.courseCount,
+        hall.trainingWeeks,
+        hall.sessionCount
+      ]);
+    });
+    
+    hallenRows.push([]);
+    hallenRows.push(['GESAMT', hallData.summary.totalHours, '', '', '']);
+    
+    const hallenSheet = XLSX.utils.aoa_to_sheet(hallenRows);
+    XLSX.utils.book_append_sheet(wb, hallenSheet, 'Hallen');
+    
+    // Download
+    const fileName = activeTab === 'yearly' 
+      ? `TSV_Rot_Bericht_${year}.xlsx`
+      : `TSV_Rot_Bericht_${startDate}_${endDate}.xlsx`;
+    
+    XLSX.writeFile(wb, fileName);
+  };
+
+  // PDF Export
+  const exportToPDF = () => {
+    if (!trainerData || !hallData) return;
+
+    const doc = new jsPDF();
+    
+    const title = activeTab === 'yearly' 
+      ? `TSV Rot Turnen - Bericht ${year}`
+      : `TSV Rot Turnen - Bericht ${formatDate(startDate)} - ${formatDate(endDate)}`;
+    
+    // Header
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Erstellt am: ${new Date().toLocaleDateString('de-DE')}`, 14, 28);
+    
+    // Trainer Table
+    doc.setFontSize(14);
+    doc.text('Trainer-Stunden', 14, 40);
+    
+    const trainerRows = trainerData.trainers.map(t => [
+      t.name,
+      `${t.totalHours.toFixed(1)}h`,
+      t.trainingWeeks,
+      t.sessionCount
+    ]);
+    
+    trainerRows.push([
+      'GESAMT',
+      `${trainerData.summary.totalHours.toFixed(1)}h`,
+      '',
+      ''
+    ]);
+    
+    doc.autoTable({
+      startY: 45,
+      head: [['Trainer', 'Stunden', 'Wochen', 'Trainings']],
+      body: trainerRows,
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235] },
+      footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+    
+    // Hallen Table
+    const hallenStartY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.text('Hallen-Auslastung', 14, hallenStartY);
+    
+    const hallenRows = hallData.halls.map(h => [
+      h.location,
+      `${h.totalHours.toFixed(1)}h`,
+      h.courseCount,
+      h.trainingWeeks,
+      h.sessionCount
+    ]);
+    
+    hallenRows.push([
+      'GESAMT',
+      `${hallData.summary.totalHours.toFixed(1)}h`,
+      '',
+      '',
+      ''
+    ]);
+    
+    doc.autoTable({
+      startY: hallenStartY + 5,
+      head: [['Halle', 'Stunden', 'Kurse', 'Wochen', 'Trainings']],
+      body: hallenRows,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+      footStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+    
+    // Download
+    const fileName = activeTab === 'yearly' 
+      ? `TSV_Rot_Bericht_${year}.pdf`
+      : `TSV_Rot_Bericht_${startDate}_${endDate}.pdf`;
+    
+    doc.save(fileName);
   };
 
   return (
@@ -404,19 +547,27 @@ export default function Reports({ apiUrl }) {
             </div>
           </section>
 
-          {/* Export Buttons (für später) */}
+          {/* Export Buttons */}
           <div className="flex gap-4 justify-end">
             <button
-              disabled
-              className="px-6 py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-              title="Noch nicht implementiert"
+              onClick={exportToExcel}
+              disabled={!trainerData || !hallData || loading}
+              className={`px-6 py-3 rounded-lg font-medium transition ${
+                !trainerData || !hallData || loading
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
             >
               📊 Excel Export
             </button>
             <button
-              disabled
-              className="px-6 py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-              title="Noch nicht implementiert"
+              onClick={exportToPDF}
+              disabled={!trainerData || !hallData || loading}
+              className={`px-6 py-3 rounded-lg font-medium transition ${
+                !trainerData || !hallData || loading
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
             >
               📄 PDF Export
             </button>
