@@ -8,7 +8,8 @@ import {
   FileText,
   Tag,
   Edit2,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 const API_URL = window.location.hostname === 'localhost' 
@@ -27,6 +28,13 @@ export default function Activities({
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingActivityId, setEditingActivityId] = useState(null);
+  
+  // NEU v2.12.5: Activity Notes State
+  const [activityNotes, setActivityNotes] = useState({});  // { "date_title": [notes] }
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteModalActivity, setNoteModalActivity] = useState(null);
+  const [editingNote, setEditingNote] = useState(null);
+  const [noteForm, setNoteForm] = useState({ note_type: 'internal', note_text: '' });
   
   const [activityForm, setActivityForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -58,9 +66,156 @@ export default function Activities({
       const data = await response.json();
       setActivities(data);
       setError(null);
+      
+      // NEU v2.12.5: Lade Notizen für alle Aktivitäten
+      await loadAllActivityNotes(data);
     } catch (err) {
       console.error('Error loading activities:', err);
       setError('Aktivitäten konnten nicht geladen werden');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // NEU v2.12.5: Lade alle Notizen für Aktivitäten
+  const loadAllActivityNotes = async (activitiesList) => {
+    const notesMap = {};
+    
+    // Sammle alle einzigartigen date+title Kombinationen
+    const uniqueActivities = new Map();
+    activitiesList.forEach(activity => {
+      const dateStr = activity.date.split('T')[0];
+      const key = `${dateStr}_${activity.title}`;
+      if (!uniqueActivities.has(key)) {
+        uniqueActivities.set(key, { date: dateStr, title: activity.title });
+      }
+    });
+    
+    // Lade Notizen für jede Aktivität
+    for (const [key, { date, title }] of uniqueActivities) {
+      try {
+        const response = await fetch(`${API_URL}/activity-notes?date=${date}&title=${encodeURIComponent(title)}`);
+        if (response.ok) {
+          const notes = await response.json();
+          if (notes.length > 0) {
+            notesMap[key] = notes;
+          }
+        }
+      } catch (err) {
+        console.error(`Error loading notes for ${key}:`, err);
+      }
+    }
+    
+    setActivityNotes(notesMap);
+  };
+
+  // NEU v2.12.5: Notiz-Key für eine Aktivität
+  const getActivityNoteKey = (activity) => {
+    const dateStr = activity.date.split('T')[0];
+    return `${dateStr}_${activity.title}`;
+  };
+
+  // NEU v2.12.5: Notizen für eine Aktivität holen
+  const getNotesForActivity = (activity) => {
+    const key = getActivityNoteKey(activity);
+    return activityNotes[key] || [];
+  };
+
+  // NEU v2.12.5: Note Modal öffnen
+  const openNoteModal = (activity, note = null) => {
+    setNoteModalActivity(activity);
+    setEditingNote(note);
+    if (note) {
+      setNoteForm({ note_type: note.note_type, note_text: note.note_text });
+    } else {
+      setNoteForm({ note_type: 'internal', note_text: '' });
+    }
+    setShowNoteModal(true);
+  };
+
+  // NEU v2.12.5: Note Modal schließen
+  const closeNoteModal = () => {
+    setShowNoteModal(false);
+    setNoteModalActivity(null);
+    setEditingNote(null);
+    setNoteForm({ note_type: 'internal', note_text: '' });
+  };
+
+  // NEU v2.12.5: Notiz speichern
+  const saveActivityNote = async () => {
+    if (!noteForm.note_text.trim()) {
+      setError('Bitte Notiztext eingeben');
+      return;
+    }
+
+    const dateStr = noteModalActivity.date.split('T')[0];
+    const weekNum = getWeekNumber(new Date(dateStr));
+    const yearNum = new Date(dateStr).getFullYear();
+
+    try {
+      setLoading(true);
+      
+      if (editingNote) {
+        // Bearbeiten
+        const response = await fetch(`${API_URL}/activity-notes/${editingNote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            note_type: noteForm.note_type,
+            note_text: noteForm.note_text
+          })
+        });
+        
+        if (!response.ok) throw new Error('Fehler beim Aktualisieren');
+      } else {
+        // Neu erstellen
+        const response = await fetch(`${API_URL}/activity-notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_date: dateStr,
+            activity_title: noteModalActivity.title,
+            week_number: weekNum,
+            year: yearNum,
+            note_type: noteForm.note_type,
+            note_text: noteForm.note_text
+          })
+        });
+        
+        if (!response.ok) throw new Error('Fehler beim Erstellen');
+      }
+      
+      // Notizen neu laden
+      await loadAllActivityNotes(activities);
+      closeNoteModal();
+      setError(null);
+    } catch (err) {
+      console.error('Error saving activity note:', err);
+      setError(err.message || 'Fehler beim Speichern der Notiz');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // NEU v2.12.5: Notiz löschen
+  const deleteActivityNote = async (noteId) => {
+    if (!window.confirm('Möchten Sie diese Notiz wirklich löschen?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/activity-notes/${noteId}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) throw new Error('Fehler beim Löschen');
+      
+      await loadAllActivityNotes(activities);
+      setError(null);
+    } catch (err) {
+      console.error('Error deleting activity note:', err);
+      setError('Fehler beim Löschen der Notiz');
     } finally {
       setLoading(false);
     }
@@ -545,11 +700,16 @@ export default function Activities({
             ? activity.custom_type
             : getActivityTypeLabel(activity.activity_type);
           
+          // NEU v2.12.5: Notizen für diese Aktivität
+          const notes = getNotesForActivity(activity);
+          const internalNotes = notes.filter(n => n.note_type === 'internal');
+          const publicNotes = notes.filter(n => n.note_type === 'public');
+          
           return (
             <div key={`${activity.date}_${activity.title}_${index}`} className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <span className="text-sm font-medium text-gray-500 flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
                       {new Date(activity.date).toLocaleDateString('de-DE', { 
@@ -563,7 +723,7 @@ export default function Activities({
                       <Tag className="w-3 h-3 mr-1" />
                       {activityTypeLabel}
                     </span>
-                    {/* NEU: Visibility Badge */}
+                    {/* Visibility Badge */}
                     {activity.visibility === 'public' ? (
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded flex items-center">
                         📢 Für Eltern
@@ -571,6 +731,17 @@ export default function Activities({
                     ) : (
                       <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded flex items-center">
                         🔒 Intern
+                      </span>
+                    )}
+                    {/* NEU v2.12.5: Notes Badges */}
+                    {internalNotes.length > 0 && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded flex items-center">
+                        🔒 {internalNotes.length}
+                      </span>
+                    )}
+                    {publicNotes.length > 0 && (
+                      <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded flex items-center">
+                        📢 {publicNotes.length}
                       </span>
                     )}
                   </div>
@@ -614,6 +785,7 @@ export default function Activities({
                 )}
               </div>
 
+              {/* Beschreibung (alte notes) */}
               {activity.notes && (
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-start">
@@ -621,6 +793,66 @@ export default function Activities({
                     <p className="text-sm text-gray-700">{activity.notes}</p>
                   </div>
                 </div>
+              )}
+
+              {/* NEU v2.12.5: Notizen-Liste */}
+              {notes.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Notizen ({notes.length})
+                  </h4>
+                  {notes.map(note => (
+                    <div 
+                      key={note.id}
+                      className={`p-3 rounded-lg border ${
+                        note.note_type === 'public' 
+                          ? 'bg-purple-50 border-purple-200' 
+                          : 'bg-yellow-50 border-yellow-200'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <span className={`text-xs font-medium ${
+                            note.note_type === 'public' ? 'text-purple-700' : 'text-yellow-700'
+                          }`}>
+                            {note.note_type === 'public' ? '📢 Für Eltern' : '🔒 Intern'}
+                          </span>
+                          <p className="text-sm text-gray-700 mt-1">{note.note_text}</p>
+                        </div>
+                        {adminMode && (
+                          <div className="flex gap-1 ml-2">
+                            <button
+                              onClick={() => openNoteModal(activity, note)}
+                              className="text-blue-500 hover:text-blue-700 p-1"
+                              title="Bearbeiten"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => deleteActivityNote(note.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                              title="Löschen"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* NEU v2.12.5: Notiz hinzufügen Button */}
+              {adminMode && (
+                <button
+                  onClick={() => openNoteModal(activity)}
+                  className="mb-4 text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Notiz hinzufügen
+                </button>
               )}
               
               <div>
@@ -646,6 +878,119 @@ export default function Activities({
           <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
           <p>Noch keine Aktivitäten erfasst.</p>
           <p className="text-sm mt-1">Fügen Sie oben Ihre erste außerplanmäßige Aktivität hinzu!</p>
+        </div>
+      )}
+
+      {/* NEU v2.12.5: Note Modal */}
+      {showNoteModal && noteModalActivity && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold">
+                {editingNote ? 'Notiz bearbeiten' : 'Neue Notiz'}
+              </h3>
+              <button
+                onClick={closeNoteModal}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div className="text-sm text-gray-600">
+                Für: <span className="font-medium">{noteModalActivity.title}</span>
+              </div>
+              
+              {/* Notiz-Typ Auswahl */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Sichtbarkeit
+                </label>
+                <div className="flex gap-3">
+                  <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    noteForm.note_type === 'internal' 
+                      ? 'border-yellow-500 bg-yellow-50' 
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="note_type"
+                      value="internal"
+                      checked={noteForm.note_type === 'internal'}
+                      onChange={(e) => setNoteForm({...noteForm, note_type: e.target.value})}
+                      className="sr-only"
+                    />
+                    <div className="text-center">
+                      <span className="text-lg">🔒</span>
+                      <p className="text-sm font-medium mt-1">Intern</p>
+                      <p className="text-xs text-gray-500">Nur für Trainer</p>
+                    </div>
+                  </label>
+                  
+                  <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    noteForm.note_type === 'public' 
+                      ? 'border-purple-500 bg-purple-50' 
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="note_type"
+                      value="public"
+                      checked={noteForm.note_type === 'public'}
+                      onChange={(e) => setNoteForm({...noteForm, note_type: e.target.value})}
+                      className="sr-only"
+                    />
+                    <div className="text-center">
+                      <span className="text-lg">📢</span>
+                      <p className="text-sm font-medium mt-1">Für Eltern</p>
+                      <p className="text-xs text-gray-500">Öffentlich sichtbar</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {noteForm.note_type === 'public' && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Diese Notiz wird im öffentlichen Kursplan für Eltern sichtbar sein!
+                  </p>
+                </div>
+              )}
+              
+              {/* Notiz-Text */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notiz
+                </label>
+                <textarea
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={noteForm.note_text}
+                  onChange={(e) => setNoteForm({...noteForm, note_text: e.target.value})}
+                  placeholder="Notiz eingeben..."
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 p-4 border-t bg-gray-50">
+              <button
+                onClick={closeNoteModal}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100"
+                disabled={loading}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={saveActivityNote}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                disabled={loading || !noteForm.note_text.trim()}
+              >
+                {loading ? 'Speichern...' : (editingNote ? 'Aktualisieren' : 'Speichern')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
