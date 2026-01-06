@@ -1018,26 +1018,6 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                           </div>
                         )}
 
-                        {/* Findet trotz Ferien statt Banner */}
-                        {isHolidayWeek() && hasCourseException(course.id) && (
-                          <div className="mb-2 px-3 py-2 bg-green-100 border border-green-300 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">✅</span>
-                                <span className="text-sm font-medium text-green-800">
-                                  FINDET STATT - Trotz Ferien
-                                </span>
-                              </div>
-                              <button
-                                onClick={() => toggleCourseException(course.id)}
-                                className="text-xs px-3 py-1 bg-red-100 text-red-800 border border-red-300 rounded hover:bg-red-200 font-medium"
-                              >
-                                ✗ Doch ausfallen lassen
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
                         {/* Kurs-Header */}
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -1200,25 +1180,37 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
                               {/* Kurs ausfallen lassen */}
                               <div className="mt-4 pt-4 border-t">
-                                <button
-                                  onClick={() => toggleCourseCancellation(course.id)}
-                                  className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${isCourseCancel(course.id)
-                                      ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
-                                      : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
-                                    }`}
-                                >
-                                  {isCourseCancel(course.id) ? (
-                                    <>
-                                      <span>✓</span>
-                                      <span>Kurs reaktivieren</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span>🚫</span>
-                                      <span>Kurs ausfallen lassen</span>
-                                    </>
-                                  )}
-                                </button>
+                                {/* Bei Ferienwoche + Exception: Button zum Entfernen der Exception */}
+                                {isHolidayWeek() && hasCourseException(course.id) ? (
+                                  <button
+                                    onClick={() => toggleCourseException(course.id)}
+                                    className="w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 bg-red-100 text-red-800 border border-red-300 hover:bg-red-200"
+                                  >
+                                    <span>🚫</span>
+                                    <span>Kurs ausfallen lassen</span>
+                                  </button>
+                                ) : (
+                                  /* Normaler Toggle für Nicht-Ferienwochen */
+                                  <button
+                                    onClick={() => toggleCourseCancellation(course.id)}
+                                    className={`w-full sm:w-auto px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${isCourseCancel(course.id)
+                                        ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
+                                        : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
+                                      }`}
+                                  >
+                                    {isCourseCancel(course.id) ? (
+                                      <>
+                                        <span>✓</span>
+                                        <span>Kurs reaktivieren</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span>🚫</span>
+                                        <span>Kurs ausfallen lassen</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                                 {isCourseCancel(course.id) && !isHolidayWeek() && (
                                   <p className="text-xs text-gray-600 mt-2">
                                     Dieser Kurs ist für diese Woche ausgefallen.
