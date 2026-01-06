@@ -164,7 +164,10 @@ export default function PublicSchedule() {
 
   // Kurse für einen Tag rendern
   const renderDayCourses = (day, courses) => {
-    if (!courses || courses.length === 0) return null;
+    const dayActivities = getActivitiesForDay(day);
+    
+    // Nur ausblenden wenn weder Kurse noch Activities vorhanden
+    if ((!courses || courses.length === 0) && dayActivities.length === 0) return null;
     
     return (
       <div key={day} className="mb-6">
@@ -172,7 +175,8 @@ export default function PublicSchedule() {
           {day}
         </h3>
         <div className="space-y-3">
-          {courses.map(course => (
+          {/* Kurse */}
+          {courses && courses.map(course => (
             <div 
               key={course.id}
               className={`p-4 rounded-lg border-l-4 ${
@@ -244,8 +248,8 @@ export default function PublicSchedule() {
           ))}
           
           {/* ✅ NEU v2.12.0: Sonderaktivitäten */}
-          {getActivitiesForDay(day).length > 0 && (
-            <div className="mt-4">
+          {dayActivities.length > 0 && (
+            <div className={courses && courses.length > 0 ? "mt-4" : ""}>
               <div className="mb-2 pb-1 border-b border-purple-200">
                 <h4 className="text-sm font-semibold text-purple-700 flex items-center gap-1">
                   <span>🎯</span>
@@ -253,7 +257,7 @@ export default function PublicSchedule() {
                 </h4>
               </div>
               
-              {getActivitiesForDay(day).map(activity => (
+              {dayActivities.map(activity => (
                 <div
                   key={`activity-${activity.id}`}
                   className="bg-gradient-to-r from-purple-50 via-pink-50 to-purple-50 border-2 border-purple-300 rounded-lg p-5 shadow-md mb-3 hover:shadow-lg transition-all"
