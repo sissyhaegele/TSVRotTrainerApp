@@ -1,6 +1,6 @@
 // ============================================
 // PublicSchedule.jsx - Öffentliche Eltern-Ansicht
-// v2.8.0 - MIT ÖFFENTLICHEN NOTIZEN
+// v2.12.4 - MIT KURS-AUSNAHMEN + DYNAMISCHEM FERIEN-BANNER
 // Speichern unter: src/components/PublicSchedule.jsx
 // ============================================
 
@@ -46,6 +46,7 @@ export default function PublicSchedule() {
   const [weekDates, setWeekDates] = useState({ start: '', end: '' });
   const [isHolidayWeek, setIsHolidayWeek] = useState(false);
   const [holidayName, setHolidayName] = useState(null);
+  const [hasExceptions, setHasExceptions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showQR, setShowQR] = useState(false);
@@ -73,6 +74,7 @@ export default function PublicSchedule() {
         setWeekDates(data.weekDates);
         setIsHolidayWeek(data.isHolidayWeek);
         setHolidayName(data.holidayName);
+        setHasExceptions(data.hasExceptions || false);
         // ✅ NEU v2.12.0: Öffentliche Activities laden
         setPublicActivities(data.activities || []);
       } else {
@@ -345,7 +347,7 @@ export default function PublicSchedule() {
               {isHolidayWeek && (
                 <div className="text-amber-600 font-medium text-sm mt-1 flex items-center justify-center gap-1">
                   <span>🏖️</span>
-                  <span>{holidayName || 'Ferien'}</span>
+                  <span>Ferienwoche</span>
                 </div>
               )}
               {!isCurrentWeek && (
@@ -439,14 +441,14 @@ export default function PublicSchedule() {
             {isHolidayWeek && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-center">
                 <p className="text-amber-800 font-medium text-lg">
-                  🏖️ {holidayName || 'Ferien'} - Alle Kurse fallen aus
+                  🏖️ Ferienwoche - {hasExceptions ? 'Einige Kurse fallen aus' : 'Alle Kurse fallen aus'}
                 </p>
                 
                 {/* ✅ NEU v2.12.0: Hinweis auf Activities */}
                 {publicActivities.length > 0 && (
                   <div className="mt-4 p-4 bg-white rounded-lg border-2 border-purple-300">
                     <p className="text-purple-800 font-semibold mb-2">
-                      ⚠️ Aber Achtung: In dieser Woche finden {publicActivities.length} besondere Aktivität(en) statt!
+                      🎯 In dieser Woche {publicActivities.length === 1 ? 'findet 1 besondere Aktivität' : `finden ${publicActivities.length} besondere Aktivitäten`} statt!
                     </p>
                     <p className="text-sm text-purple-700">
                       Siehe unten für Details zu Ferienprogrammen, Workshops oder Wettkämpfen.

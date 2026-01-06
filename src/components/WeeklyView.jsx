@@ -916,7 +916,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
                 <div>
                   <span className="font-semibold text-yellow-800">Ferienwoche</span>
                   <span className="text-yellow-700 text-sm ml-2">
-                    Alle Kurse fallen aus (außer markierte Ausnahmen)
+                    {courseExceptions.size > 0 
+                      ? 'Einige Kurse fallen aus' 
+                      : 'Alle Kurse fallen aus'}
                   </span>
                 </div>
               </div>
