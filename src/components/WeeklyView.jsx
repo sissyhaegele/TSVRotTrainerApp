@@ -1312,11 +1312,11 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
         <div className="mt-3 pt-3 border-t border-gray-200">
           <div className="flex flex-wrap gap-4 text-xs sm:text-sm">
             <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">🔒1</span>
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">🔒</span>
               <span>Interne Notiz (nur Trainer)</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">📢1</span>
+              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">📢</span>
               <span>Öffentliche Notiz (für Eltern)</span>
             </div>
           </div>
