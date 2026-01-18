@@ -255,11 +255,9 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
           setWeeklyAssignments(formattedAssignments);
           
-          // v2.8.0: Notizen setzen wenn vorhanden
-          if (Object.keys(formattedNotes).length > 0) {
-            setCourseNotes(formattedNotes);
-            console.log(`📝 Notizen aus Batch geladen:`, Object.keys(formattedNotes).length, 'Kurse');
-          }
+          // v2.8.0: Notizen setzen (IMMER - auch wenn leer, um alte Woche zu clearen!)
+          setCourseNotes(formattedNotes);
+          console.log(`📝 Notizen aus Batch geladen:`, Object.keys(formattedNotes).length, 'Kurse');
           
           console.log(`📥 Weekly Assignments geladen für KW ${weekNum}/${year}`);
 
