@@ -1,8 +1,8 @@
 # 🏃 TSV Rot Turnen - Trainer-App
 ## Anwender-Dokumentation für Trainer
 
-**Version:** 2.11.0  
-**Stand:** 05. Januar 2026  
+**Version:** 2.11.1  
+**Stand:** 18. Januar 2026  
 **Für:** Alle Trainer der TSV Rot Turnabteilung
 
 ---
@@ -511,6 +511,6 @@ Bei Fragen: Einfach den Admin oder erfahrene Kollegen fragen! 😊
 
 ---
 
-**Version:** 2.11.0  
-**Letzte Aktualisierung:** 05. Januar 2026  
+**Version:** 2.11.1  
+**Letzte Aktualisierung:** 18. Januar 2026  
 **Erstellt für:** TSV Rot Turnabteilung
