@@ -648,16 +648,26 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
     try {
       if (isCurrentlyCancelled) {
-        await fetch(`${API_URL}/cancelled-courses/${courseId}/${weekNumber}/${year}`, {
+        // Kurs reaktivieren (DELETE)
+        const response = await fetch(`${API_URL}/cancelled-courses?course_id=${courseId}&week_number=${weekNumber}&year=${year}`, {
           method: 'DELETE'
         });
-        setCancelledCourses(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
+        
+        if (response.ok) {
+          setCancelledCourses(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          console.log(`✅ Kurs ${courseId} reaktiviert für KW ${weekNumber}/${year}`);
+        } else {
+          console.error(`❌ DELETE fehlgeschlagen: ${response.status} ${response.statusText}`);
+          const errorText = await response.text().catch(() => '');
+          console.error('Server-Antwort:', errorText);
+        }
       } else {
-        await fetch(`${API_URL}/cancelled-courses`, {
+        // Kurs ausfallen lassen (POST)
+        const response = await fetch(`${API_URL}/cancelled-courses`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -666,11 +676,19 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             year: year
           })
         });
-        setCancelledCourses(prev => {
-          const next = new Set(prev);
-          next.add(key);
-          return next;
-        });
+        
+        if (response.ok) {
+          setCancelledCourses(prev => {
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+          });
+          console.log(`🚫 Kurs ${courseId} ausgefallen für KW ${weekNumber}/${year}`);
+        } else {
+          console.error(`❌ POST fehlgeschlagen: ${response.status} ${response.statusText}`);
+          const errorText = await response.text().catch(() => '');
+          console.error('Server-Antwort:', errorText);
+        }
       }
     } catch (error) {
       console.error('Fehler beim Ändern des Kurs-Status:', error);
@@ -683,16 +701,22 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
 
     try {
       if (hasException) {
-        await fetch(`${API_URL}/course-exceptions/${courseId}/${weekNumber}/${year}`, {
+        const response = await fetch(`${API_URL}/course-exceptions?course_id=${courseId}&week_number=${weekNumber}&year=${year}`, {
           method: 'DELETE'
         });
-        setCourseExceptions(prev => {
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
+        
+        if (response.ok) {
+          setCourseExceptions(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          console.log(`✅ Kurs-Ausnahme entfernt: Kurs ${courseId} KW ${weekNumber}/${year}`);
+        } else {
+          console.error(`❌ Exception DELETE fehlgeschlagen: ${response.status}`);
+        }
       } else {
-        await fetch(`${API_URL}/course-exceptions`, {
+        const response = await fetch(`${API_URL}/course-exceptions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -701,11 +725,17 @@ const WeeklyView = ({ courses, trainers, setCourses }) => {
             year: year
           })
         });
-        setCourseExceptions(prev => {
-          const next = new Set(prev);
-          next.add(key);
-          return next;
-        });
+        
+        if (response.ok) {
+          setCourseExceptions(prev => {
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+          });
+          console.log(`✅ Kurs-Ausnahme hinzugefügt: Kurs ${courseId} KW ${weekNumber}/${year}`);
+        } else {
+          console.error(`❌ Exception POST fehlgeschlagen: ${response.status}`);
+        }
       }
     } catch (error) {
       console.error('Fehler beim Ändern der Kurs-Ausnahme:', error);
