@@ -1,6 +1,6 @@
 // ============================================
 // PublicSchedule.jsx - Öffentliche Eltern-Ansicht
-// v2.12.4 - MIT KURS-AUSNAHMEN + DYNAMISCHEM FERIEN-BANNER
+// v2.12.5 - MIT KURS-AUSNAHMEN + DYNAMISCHEM FERIEN-BANNER + DATUM BEI TAGEN
 // Speichern unter: src/components/PublicSchedule.jsx
 // ============================================
 
@@ -34,6 +34,21 @@ function getISOWeekNumber(date) {
 }
 
 const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+// Hilfsfunktion: Datum für einen bestimmten Wochentag einer ISO-Kalenderwoche berechnen
+// dayIndex: 0=Montag, 1=Dienstag, ..., 6=Sonntag
+function getDateForDayInWeek(weekNumber, year, dayIndex) {
+  // ISO-Woche 1 enthält den 4. Januar
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  // Montag der KW 1 berechnen
+  const dayOfWeek = jan4.getUTCDay() || 7; // Sonntag = 7
+  const mondayOfWeek1 = new Date(jan4);
+  mondayOfWeek1.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1));
+  // Zum gewünschten Tag navigieren
+  const targetDate = new Date(mondayOfWeek1);
+  targetDate.setUTCDate(mondayOfWeek1.getUTCDate() + (weekNumber - 1) * 7 + dayIndex);
+  return targetDate;
+}
 
 export default function PublicSchedule() {
   // URL-Parameter auslesen oder aktuelle Woche
@@ -173,6 +188,13 @@ export default function PublicSchedule() {
       <div key={day} className="mb-6">
         <h3 className="text-lg font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
           {day}
+          <span className="text-sm font-normal text-gray-500 ml-2">
+            {(() => {
+              const dayIndex = DAYS.indexOf(day);
+              const date = getDateForDayInWeek(weekNumber, year, dayIndex);
+              return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+            })()}
+          </span>
         </h3>
         <div className="space-y-3">
           {/* Kurse */}
