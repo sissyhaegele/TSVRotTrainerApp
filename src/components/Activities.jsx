@@ -354,7 +354,7 @@ export default function Activities({
     }
   };
 
-  const deleteActivity = async (activityId, date) => {
+  const deleteActivity = async (activityId, date, title) => {
     if (!window.confirm('Möchten Sie diese Aktivität wirklich löschen? Alle Stunden werden von den beteiligten Trainern abgezogen.')) {
       return;
     }
@@ -362,11 +362,19 @@ export default function Activities({
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_URL}/special-activities/${activityId}`, {
-        method: 'DELETE'
-      });
+      // Finde alle Einträge mit gleichem Datum+Titel (ein Eintrag pro Trainer)
+      const dateStr = date.split('T')[0];
+      const allIds = activities
+        .filter(a => a.date.split('T')[0] === dateStr && a.title === title)
+        .map(a => a.id);
       
-      if (!response.ok) throw new Error('Fehler beim Löschen');
+      // Lösche alle zugehörigen Einträge
+      for (const id of allIds) {
+        const response = await fetch(`${API_URL}/special-activities/${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Fehler beim Löschen');
+      }
       
       await loadActivities();
       setError(null);
@@ -771,16 +779,14 @@ export default function Activities({
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    {deleteMode && (
-                      <button
-                        onClick={() => deleteActivity(activity.id, activity.date)}
-                        disabled={loading}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
-                        title="Löschen"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteActivity(activity.id, activity.date, activity.title)}
+                      disabled={loading}
+                      className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                      title="Löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
               </div>
