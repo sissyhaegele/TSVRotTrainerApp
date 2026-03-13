@@ -36,6 +36,7 @@ export default function Courses({
     endTime: '',
     location: '',
     category: '',
+    departmentId: 'turnen',
     assignedTrainerIds: [],
     requiredTrainers: 2
   });
@@ -49,6 +50,15 @@ export default function Courses({
     'Kinderturnen', 'Fitness', 'Seniorensport', 
     'Ballsport', 'Gymnastik', 'Sonstiges'
   ];
+
+  const departments = [
+    { id: 'turnen',         label: 'Turnen',         color: '#16a34a', bg: '#f0fdf4' },
+    { id: 'handball',       label: 'Handball',       color: '#2563eb', bg: '#eff6ff' },
+    { id: 'leichtathletik', label: 'Leichtathletik', color: '#d97706', bg: '#fffbeb' },
+    { id: 'verein',         label: 'Gesamtverein',   color: '#b91c1c', bg: '#fef2f2' },
+  ];
+
+  const getDept = (id) => departments.find(d => d.id === id) || departments[0];
 
   // Lade Kurse beim Start
   useEffect(() => {
@@ -102,6 +112,7 @@ export default function Courses({
             endTime: newCourse.endTime || null,
             location: newCourse.location || null,
             category: newCourse.category || null,
+            departmentId: newCourse.departmentId || 'turnen',
             requiredTrainers: parseInt(newCourse.requiredTrainers) || 2,
             assignedTrainerIds: newCourse.assignedTrainerIds || []
           })
@@ -118,6 +129,7 @@ export default function Courses({
           endTime: '',
           location: '',
           category: '',
+          departmentId: 'turnen',
           assignedTrainerIds: [],
           requiredTrainers: 2
         });
@@ -156,6 +168,7 @@ export default function Courses({
     setEditingCourse({
       ...course,
       requiredTrainers: course.requiredTrainers || course.required_trainers || 2,
+      departmentId: course.departmentId || course.department_id || 'turnen',
       assignedTrainerIds: course.assignedTrainerIds || []
     });
   };
@@ -173,6 +186,7 @@ export default function Courses({
           endTime: editingCourse.endTime || editingCourse.end_time || null,
           location: editingCourse.location || null,
           category: editingCourse.category || null,
+          departmentId: editingCourse.departmentId || editingCourse.department_id || 'turnen',
           requiredTrainers: parseInt(editingCourse.requiredTrainers) || 2,
           assignedTrainerIds: editingCourse.assignedTrainerIds || []
         })
@@ -226,6 +240,7 @@ export default function Courses({
           endTime: course.endTime || course.end_time || null,
           location: course.location || null,
           category: course.category || null,
+          departmentId: course.departmentId || course.department_id || 'turnen',
           requiredTrainers: course.requiredTrainers || course.required_trainers || 2,
           assignedTrainerIds: newIds
         })
@@ -266,6 +281,7 @@ export default function Courses({
           endTime: course.endTime || course.end_time || null,
           location: course.location || null,
           category: course.category || null,
+          departmentId: course.departmentId || course.department_id || 'turnen',
           requiredTrainers: course.requiredTrainers || course.required_trainers || 2,
           assignedTrainerIds: newIds
         })
@@ -415,6 +431,17 @@ export default function Courses({
             ))}
           </select>
 
+          <select
+            className="px-3 py-2 border rounded-lg font-medium"
+            value={newCourse.departmentId}
+            onChange={(e) => setNewCourse({...newCourse, departmentId: e.target.value})}
+            disabled={loading}
+          >
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>{d.label}</option>
+            ))}
+          </select>
+
           <div className="flex items-center space-x-2">
             <label className="text-sm text-gray-600">Benötigte Trainer:</label>
             <input
@@ -474,6 +501,17 @@ export default function Courses({
                     <option value="">Kategorie</option>
                     {categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="px-3 py-2 border rounded-lg font-medium col-span-2"
+                    value={editingCourse.departmentId || editingCourse.department_id || 'turnen'}
+                    onChange={(e) => setEditingCourse({...editingCourse, departmentId: e.target.value})}
+                    disabled={loading}
+                  >
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id}>{d.label}</option>
                     ))}
                   </select>
                   
@@ -540,12 +578,23 @@ export default function Courses({
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold">{getCourseName(course)}</h3>
-                    {course.category && (
-                      <span className="inline-flex items-center text-xs text-gray-500 mt-1">
-                        <Tag className="w-3 h-3 mr-1" />
-                        {course.category}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      {(() => {
+                        const dept = getDept(course.department_id || course.departmentId);
+                        return (
+                          <span style={{ backgroundColor: dept.bg, color: dept.color, border: `1px solid ${dept.color}33` }}
+                            className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full">
+                            {dept.label}
+                          </span>
+                        );
+                      })()}
+                      {course.category && (
+                        <span className="inline-flex items-center text-xs text-gray-500">
+                          <Tag className="w-3 h-3 mr-1" />
+                          {course.category}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     {getStaffingBadge(course)}
