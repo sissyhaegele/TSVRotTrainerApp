@@ -5,11 +5,8 @@ import Courses from './components/Courses';
 import Trainers from './components/Trainers';
 import Activities from './components/Activities';
 import PublicSchedule from './components/PublicSchedule';
-import Reports from './components/Reports';  // ← NEU
-
-const API_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8181/api'
-  : 'https://tsvrottrainerappbackend-dedsbkhuathccma8.germanywestcentral-01.azurewebsites.net/api';
+import Reports from './components/Reports';
+import { API_URL } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('weekly-plan');
@@ -25,13 +22,11 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ============================================
-  // NEU: Öffentlicher Kursplan ohne Login
+  // Öffentlicher Kursplan ohne Login
   // ============================================
-  // Prüfe ob die URL /kursplan enthält
   const isPublicKursplan = window.location.pathname === '/kursplan' || 
                            window.location.pathname.startsWith('/kursplan');
   
-  // Wenn /kursplan aufgerufen wird, zeige öffentliche Seite OHNE Login
   if (isPublicKursplan) {
     return <PublicSchedule />;
   }
@@ -149,7 +144,6 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14">
             <div className="flex items-center gap-3">
-              {/* Mobile Menu Button - IM HEADER */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="lg:hidden p-2 hover:bg-red-700 rounded-md transition-colors"
@@ -170,7 +164,6 @@ function App() {
       </div>
       
       <div className="flex h-screen pt-14">
-        {/* Backdrop für Mobile Menu */}
         {mobileMenuOpen && (
           <div 
             className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
@@ -178,7 +171,6 @@ function App() {
           />
         )}
         
-        {/* Sidebar - ✅ HIDDEN auf Mobile wenn geschlossen, FIXED als Overlay wenn offen */}
         <div className={`
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           fixed lg:relative 
@@ -275,7 +267,6 @@ function App() {
           </div>
         </div>
 
-        {/* Content Area - Nimmt auf Desktop Platz NEBEN Sidebar, auf Mobile VOLLE Breite */}
         <div className="flex-1 overflow-auto w-full">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             {loading && (
